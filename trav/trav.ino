@@ -355,21 +355,22 @@ void loop() {
       }
     }
     
-    int waiting_time = 1/(frequency*resolution*2);
-    cycleEndTime = millis();
-    while(cycleEndTime - cycleStartTime < waiting_time) {
+    int waiting_time = 1/(frequency*resolution*2)*1000; //Calcula o periodo esperado dado a frequência escolhida em milissegundos
+    cycleEndTime = millis(); // Verifica o tempo que demorou nessa iteração
+    while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período ja ocorreu, se não ele continua preso no looping até dar o tempo
       cycleEndTime = millis();
     }
-    cycleStartTime = cycleEndTime;
+    dac_output_voltage(dacChannel, value >> 4); // Converte 12 bits para 8 bits, atualiza o valor na saída
+    cycleStartTime = millis(); //Atualiza o valor de início da próxima iteração
 
   } else if (currentSystemMode == LOCK) {
     // Implementa o controle de feedback para travamento de cavidade
 
     //Calcula o novo valor a ser passado para o PZT
     value += direction*step;
-    dac_output_voltage(dacChannel, value >> 4); // Converte 12 bits para 8 bits, resolução do DAC
+    dac_output_voltage(dacChannel, value >> 4); // Converte 12 bits para 8 bits, atualiza o valor na saída
 
-    //Verifica a resposta do sistema
+    //Verifica a resposta do sistema, faz uma média na leitura para filtrar ruídos de alta frequência
     long adcSum = 0;
     for (int i = 0; i < numReadings; i++) {
       adcSum += adc1_get_raw(adcChannel);
