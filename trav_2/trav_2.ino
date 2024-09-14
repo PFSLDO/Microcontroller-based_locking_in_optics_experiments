@@ -51,18 +51,24 @@ bool modeButton = false;
 
 enum ModeSweep { AMPLITUDE, FREQUENCY }; // Vetor opções de configuração no modo de varredura
 ModeSweep currentModeSweep = AMPLITUDE;       // e inicializa na amplitude
-enum ModeLock { STEP, PEAK, AMOSTRAS };            // Vetor opções de configuração no modo de travamento
+enum ModeLock { STEP, PEAK, AMOSTRAS, INTEGRAL };            // Vetor opções de configuração no modo de travamento
 ModeLock currentModeLock = STEP;             // e inicializa no step
 enum SystemMode { SWEEP, LOCK };         // Vetor dos modos de operação do sistema
 SystemMode currentSystemMode = SWEEP;    // e inicializa na varredura
 
 int targetValue = 0; // Armazena o valor do  DAC que representa o inicio do pico de interesse
-const int peakThreshold = 40; // Limiar para detectar picos = 50mV 
-const int resetThreshold = 20; // Limiar para redefinir a detecção de picos = 25mV
+const int peakThreshold = 248;  // Limiar para detectar picos = 200mV 
+const int resetThreshold = 124; // Limiar para redefinir a detecção de picos = 100mV
 bool detectingPeak = false;     // Flag para indicação de detecção de picos
 std::vector<unsigned int> peaks_place;  // Vetor para armazenar o valor de pzt respectivos para os picos
+std::vector<unsigned int> peaks_amp;   // Vetor que armazena a amplitude máxima de cada pico  
 int currentPeakIndex = 0;       // Índice do pico atual
 
+int Ki = 5; // Ganho integral
+int integral = 0;
+float value_integral = 0;
+double difT = 0;
+float erro = 0;
 
 
 /////////////////////////////////////////////////// Função de interrupção dO BOTÃO DAS OPÇÕES DE CONFIGURAÇÃO
@@ -75,7 +81,7 @@ void IRAM_ATTR handleButtonPin() {
       currentModeSweep = static_cast<ModeSweep>((currentModeSweep + 1) % 2);  // Alterna entre AMPLITUDE, FREQUENCY
     }
     else if (currentSystemMode == LOCK) { 
-      currentModeLock = static_cast<ModeLock>((currentModeLock + 1) % 3);  // Alterna entre PEAK, STEP, AMOSTRAS
+      currentModeLock = static_cast<ModeLock>((currentModeLock + 1) % 4);  // Alterna entre PEAK, STEP, AMOSTRAS, INTEGRAL
     }
   }
   lastInterruptTime = interruptTime;
@@ -104,18 +110,21 @@ void IRAM_ATTR handleIncreasePin() {
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
         case PEAK:
-          if (!peaks_place.empty()) {
-            currentPeakIndex = (currentPeakIndex + 1) % peaks_place.size(); 
-            targetValue = peaks_place[currentPeakIndex];
-            value = targetValue;
-          }
-          break;
+        if (!peaks_place.empty()) {
+          currentPeakIndex = (currentPeakIndex + 1) % peaks_place.size(); 
+          targetValue = peaks_place[currentPeakIndex];
+          value_integral = 0;
+        }
+        break;
         case STEP:
           step++;
-          break;
+        break;
         case AMOSTRAS:
           numReadings++;
-          break;
+        break;
+        case INTEGRAL:
+          integral = 1;
+        break;
       }
     }
   }
@@ -149,7 +158,7 @@ void IRAM_ATTR handleDecreasePin() {
         if (!peaks_place.empty()) {
           currentPeakIndex = (currentPeakIndex - 1 + peaks_place.size()) % peaks_place.size();
           targetValue = peaks_place[currentPeakIndex];
-          value = targetValue;
+          value_integral = 0;
         }
         break;
       case STEP:
@@ -159,6 +168,10 @@ void IRAM_ATTR handleDecreasePin() {
       case AMOSTRAS:
         numReadings--;
         if (numReadings < 1) numReadings = 1;
+        break;
+      case INTEGRAL:
+        integral = 0;
+        value_integral = 0;
         break;
       }
     }
@@ -183,6 +196,7 @@ void IRAM_ATTR handleModeSwitchPin() {
         value = targetValue; // Inicia o sistema no início do pico escolhido
         lastAdcValue = averageAdcValue - 1; // 
         direction = 1;
+        value_integral = 0;
         break;
     }
   }
@@ -240,6 +254,7 @@ void setup() {
 void loop() {
   if (currentSystemMode == SWEEP) {
     cycleStartTime = micros(); //Atualiza o valor de início da próxima iteração
+    // Gera o sinal triangular
     value += direction;
     if (value >= resolution) {
       value = resolution;
@@ -247,17 +262,34 @@ void loop() {
     } else if (value <= 0) {
       value = 0;
       direction = 1;
-    } 
-    int averageAdcValue = adc1_get_raw(adcChannel);
+      peaks_place.clear();
+      peaks_amp.clear();
+    }
+
+    // Lê a entrada do ADC 
+    long adcSum = 0;
+    for (int i = 0; i < 10; i++) {
+      adcSum += adc1_get_raw(adcChannel);
+      delayMicroseconds(10);  // Pequeno delay entre leituras para evitar leituras muito rápidas
+    }
+    int averageAdcValue = adcSum / 3;
+
     // Detecção de picos (apenas quando a varredura está em direção positiva)
     if (direction == 1) {
       if (averageAdcValue > peakThreshold) {
-        if(detectingPeak){
-          peaks_place.pop_back();}
-        peaks_place.push_back(value);
-        detectingPeak = true; } }
-    if (detectingPeak && averageAdcValue < resetThreshold) {
-      detectingPeak = false; }
+        if(averageAdcValue > lastAdcValue){
+          if(detectingPeak){
+            peaks_amp.pop_back();
+            peaks_place.pop_back();
+          }
+          peaks_amp.push_back(averageAdcValue);
+          peaks_place.push_back(value);
+          detectingPeak = true;
+        }
+      } else if (detectingPeak && averageAdcValue < resetThreshold) {
+        detectingPeak = false;
+      }
+    }
 
     //Atualizações do display após interrupções:
     if(increaseButton == true) {
@@ -278,7 +310,8 @@ void loop() {
         display.print("Hz");
         break;
       }
-      display.display();}
+      display.display();
+    }
     if(decreaseButton == true) {
       decreaseButton = false;
       switch (currentModeSweep) {
@@ -297,7 +330,8 @@ void loop() {
         display.print("Hz");
         break;
       }
-      display.display();}
+      display.display();
+    }
     if(optionButton == true) {
       optionButton = false;
       switch (currentModeSweep) {
@@ -313,7 +347,8 @@ void loop() {
         display.fillRect(0, 30, 6, 8, BLACK);
         break;
       }
-      display.display();}
+      display.display();
+    }
     if(modeButton == true) {
       modeButton = false;
       switch (currentSystemMode) {
@@ -357,6 +392,13 @@ void loop() {
         display.setCursor(15,44);
         display.print("Amostras media:");
         display.print(numReadings);
+        display.setCursor(15,56);
+        display.print("Integrador:");
+        if (integral == 1){
+          display.print("on");
+        } else {
+          display.print("off");
+        }
         switch (currentModeLock) {
           case STEP:
             display.setCursor(0,20);
@@ -370,21 +412,53 @@ void loop() {
             display.setCursor(0,44);
             display.write(62);
           break;
+          case INTEGRAL:
+            display.setCursor(0,56);
+            display.write(62);
+          break;
         }
         display.display();
-      break;} 
+      break;
+      } 
     }
+    
     cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
     while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
       cycleEndTime = micros();
     }
+    
     dac_output_voltage(dacChannel, value); // atualiza o valor na saída
-
+    lastAdcValue = averageAdcValue;
+    
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   } else if (currentSystemMode == LOCK) {
+    // Implementa o controle de feedback para travamento de cavidade
+    cycleEndTime = micros();
     //Calcula o novo valor a ser passado para o PZT
-    value += direction*step;
+    if(integral == 1){
+      Serial.println("entrou no laço");
+      erro = peaks_amp[currentPeakIndex] - lastAdcValue;
+      Serial.print("erro: ");
+      Serial.println(erro);
+      difT = (cycleEndTime - cycleStartTime);
+      Serial.print("difT: ");
+      Serial.println(difT);
+      value_integral += erro*difT/1000000;
+      Serial.print("integral: ");
+      Serial.println(value_integral);
+      int intvalue_integral = (int)value_integral;
+      Serial.print("int integral: ");
+      Serial.println(intvalue_integral);
+      value += direction*(intvalue_integral + step);
+    } else {
+      value += direction*step;
+    }
+
+    Serial.println("saiu do laço e vai upar no dac");
     dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
+    Serial.print("valor: ");
+    Serial.println(value);
+    cycleStartTime = cycleEndTime;
 
     //Verifica a resposta do sistema, fazendo uma média na leitura para filtrar o ruído
     long adcSum = 0;
@@ -393,6 +467,7 @@ void loop() {
       delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar leituras muito rápidas
     }
     int averageAdcValue = adcSum / numReadings;
+
 
     // Executa a comparação e ajuste de direção caso necessário
     if (averageAdcValue > lastAdcValue) {
@@ -425,6 +500,11 @@ void loop() {
         display.print("Amostras media:");
         display.print(numReadings);
         break;
+      case INTEGRAL:
+        display.fillRect(15, 56, 100, 8, BLACK);
+        display.setCursor(15,56);
+        display.print("Integrador: on");
+        break;
       }
       display.display();
     }
@@ -448,6 +528,11 @@ void loop() {
         display.setCursor(15,44);
         display.print("Amostras media:");
         display.print(numReadings);
+        break;
+      case INTEGRAL:
+        display.fillRect(15, 56, 100, 8, BLACK);
+        display.setCursor(15,56);
+        display.print("Integrador: off");
         break;
       }
       display.display();
@@ -476,6 +561,13 @@ void loop() {
         display.fillRect(0, 20, 6, 8, BLACK);
         display.fillRect(0, 32, 6, 8, BLACK);
         display.fillRect(0, 56, 6, 8, BLACK);
+        break;
+      case INTEGRAL:
+        display.setCursor(0,56);
+        display.write(62);
+        display.fillRect(0, 20, 6, 8, BLACK);
+        display.fillRect(0, 44, 6, 8, BLACK);
+        display.fillRect(0, 32, 6, 8, BLACK);
         break;
       }
       display.display();
@@ -523,6 +615,13 @@ void loop() {
         display.setCursor(15,44);
         display.print("Amostras media:");
         display.print(numReadings);
+        display.setCursor(15,56);
+        display.print("Integrador:");
+        if (integral == 1){
+          display.print("on");
+        } else {
+          display.print("off");
+        }
         switch (currentModeLock) {
           case STEP:
             display.setCursor(0,20);
@@ -534,6 +633,10 @@ void loop() {
           break;
           case AMOSTRAS:
             display.setCursor(0,44);
+            display.write(62);
+          break;
+          case INTEGRAL:
+            display.setCursor(0,56);
             display.write(62);
           break;
         }
