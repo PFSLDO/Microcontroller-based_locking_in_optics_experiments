@@ -1,4 +1,4 @@
-#include <adafruit_Ggfx.h>
+#include <adafruit_gfx.h>
 #include <adafruit_ssd1306.h>
 #include <driver/adc.h>
 #include <driver/dac.h>
