@@ -1,19 +1,19 @@
-#include <driver/dac.h>
+#include <adafruit_Ggfx.h>
+#include <adafruit_ssd1306.h>
 #include <driver/adc.h>
+#include <driver/dac.h>
 #include <esp_adc_cal.h>
+#include <spo.h>
 #include <vector>
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <wire.h>
+
 #define LARGURA_OLED 128
 #define ALTURA_OLED 64
- 
 #define RESET_OLED -1
  
 Adafruit_SSD1306 display(LARGURA_OLED, ALTURA_OLED, &Wire, RESET_OLED);
 
-/////////////////////////////////////// CONSTANTES  E  DEFINIÇÕES
+// CONSTANTES  E  DEFINIÇÕES
 
 // detalhes: o DAC (Saída para o PZT) tem resolução de 8 bits, de 0 à 255
 // já o ADC (leitura do fotodetector) tem resolução de 12 bits, de 0 à 4095
@@ -63,9 +63,7 @@ bool detectingPeak = false;     // Flag para indicação de detecção de picos
 std::vector<unsigned int> peaks_place;  // Vetor para armazenar o valor de pzt respectivos para os picos
 int currentPeakIndex = 0;       // Índice do pico atual
 
-
-
-/////////////////////////////////////////////////// Função de interrupção dO BOTÃO DAS OPÇÕES DE CONFIGURAÇÃO
+// Funcao de interrupcao do botao "opcoes de configuracao"
 void IRAM_ATTR handleButtonPin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
@@ -81,7 +79,7 @@ void IRAM_ATTR handleButtonPin() {
   lastInterruptTime = interruptTime;
 }
 
-/////////////////////////////////////////////////// Função de interrupção do BOTÃO DE INCREMENTO+
+// Funcao de interrupcao do botao "incremento+"
 void IRAM_ATTR handleIncreasePin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
@@ -122,8 +120,7 @@ void IRAM_ATTR handleIncreasePin() {
   lastInterruptTime = interruptTime;
 }
 
-
-/////////////////////////////////////////////////// Função de interrupção do BOTÃO DE DECREMENTO-
+// Funcao de interrupcao do botao "incremento-"
 void IRAM_ATTR handleDecreasePin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
@@ -166,8 +163,7 @@ void IRAM_ATTR handleDecreasePin() {
   lastInterruptTime = interruptTime;
 }
 
-
-/////////////////////////////////////////////////// Função de interrupção do BOTÃO DO MODO DO SISTEMA
+// Funcao de interrupcao do botao "modo do sistema"
 void IRAM_ATTR handleModeSwitchPin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
@@ -189,9 +185,7 @@ void IRAM_ATTR handleModeSwitchPin() {
   lastInterruptTime = interruptTime;
 }
 
-///////////////////////////////////////////////////// Configurações iniciais
 void setup() {
-
   Serial.begin(115200);
 
   // configura o display oled
@@ -224,7 +218,7 @@ void setup() {
   // Inicializa o valor do DAC
   dac_output_voltage(dacChannel, 0);
 
-  // Configura os botões com interrupções
+  // Configura os botoes com interrupções
   pinMode(increasePin, INPUT_PULLUP);
   pinMode(decreasePin, INPUT_PULLUP);
   pinMode(modeSwitchPin, INPUT_PULLUP);
@@ -235,128 +229,151 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(modeSwitchPin), handleModeSwitchPin, FALLING);
 }
 
-
-//////////////////////////////////////////////// Função que ficará sendo eternamente executada
 void loop() {
   if (currentSystemMode == SWEEP) {
     cycleStartTime = micros(); //Atualiza o valor de início da próxima iteração
     value += direction;
+
     if (value >= resolution) {
       value = resolution;
       direction = -1;
-    } else if (value <= 0) {
+    }
+    else if (value <= 0) {
       value = 0;
       direction = 1;
-    } 
-    int averageAdcValue = adc1_get_raw(adcChannel);
-    // Detecção de picos (apenas quando a varredura está em direção positiva)
-    if (direction == 1) {
-      if (averageAdcValue > peakThreshold) {
-        if(detectingPeak){
-          peaks_place.pop_back();}
-        peaks_place.push_back(value);
-        detectingPeak = true; } }
-    if (detectingPeak && averageAdcValue < resetThreshold) {
-      detectingPeak = false; }
+    }
 
-    //Atualizações do display após interrupções:
-    if(increaseButton == true) {
+    int averageAdcValue = adc1_get_raw(adcChannel);
+
+    if (direction == 1) { 
+      if (averageAdcValue > peakThreshold) {
+        if (detectingPeak) { // Deteccao de picos (apenas quando a varredura estah em direcao positiva)
+          peaks_place.pop_back();
+        }
+
+        peaks_place.push_back(value);
+        detectingPeak = true;
+      }
+    }
+
+    if (detectingPeak && averageAdcValue < resetThreshold) {
+      detectingPeak = false;
+    }
+
+    //Atualizacoes do display apos interrupcoes
+    if (increaseButton == true) {
       increaseButton = false;
+      
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        display.fillRect(15, 30, 100, 8, BLACK);
-        display.setCursor(15,30);
-        display.print("Amplitude:");
-        display.print(amp);
-        display.print("V");
+        case AMPLITUDE:
+          display.fillRect(15, 30, 100, 8, BLACK);
+          display.setCursor(15,30);
+          display.print("Amplitude:");
+          display.print(amp);
+          display.print("V");
         break;
-      case FREQUENCY:
-        display.fillRect(15, 50, 100, 8, BLACK);
-        display.setCursor(15,50);
-        display.print("Frequencia:");
-        display.print(frequency);
-        display.print("Hz");
+        case FREQUENCY:
+          display.fillRect(15, 50, 100, 8, BLACK);
+          display.setCursor(15,50);
+          display.print("Frequencia:");
+          display.print(frequency);
+          display.print("Hz");
         break;
       }
-      display.display();}
-    if(decreaseButton == true) {
+
+      display.display();
+    }
+    
+    if (decreaseButton == true) {
       decreaseButton = false;
+      
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        display.fillRect(15, 30, 100, 8, BLACK);
-        display.setCursor(15,30);
-        display.print("Amplitude:");
-        display.print(amp);
-        display.print("V");
+        case AMPLITUDE:
+          display.fillRect(15, 30, 100, 8, BLACK);
+          display.setCursor(15,30);
+          display.print("Amplitude:");
+          display.print(amp);
+          display.print("V");
         break;
-      case FREQUENCY:
-        display.fillRect(15, 50, 100, 8, BLACK);
-        display.setCursor(15,50);
-        display.print("Frequencia:");
-        display.print(frequency);
-        display.print("Hz");
+        case FREQUENCY:
+          display.fillRect(15, 50, 100, 8, BLACK);
+          display.setCursor(15,50);
+          display.print("Frequencia:");
+          display.print(frequency);
+          display.print("Hz");
         break;
       }
-      display.display();}
-    if(optionButton == true) {
+      
+      display.display();
+    }
+    if  (optionButton == true) {
       optionButton = false;
+      
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        display.setCursor(0,30);
-        display.write(62);
-        display.fillRect(0, 50, 6, 8, BLACK);
-        display.display();
-        break;
-      case FREQUENCY:
-        display.setCursor(0,50);
-        display.write(62);
-        display.fillRect(0, 30, 6, 8, BLACK);
-        break;
-      }
-      display.display();}
-    if(modeButton == true) {
-      modeButton = false;
-      switch (currentSystemMode) {
-      case SWEEP:
-        display.setTextSize(1);
-        display.setTextColor(WHITE);
-        display.clearDisplay();
-        display.setCursor(15,8);
-        display.print("Modo:Varredura");
-        display.drawLine(15, 17, 15+14*6, 17, WHITE);
-        display.setCursor(15,30);
-        display.print("Amplitude:");
-        display.print(amp);
-        display.print("V:");
-        display.setCursor(15,50);
-        display.print("Frequencia:");
-        display.print(frequency);
-        display.print("Hz");
-        if (currentModeSweep == 0) {
+        case AMPLITUDE:
           display.setCursor(0,30);
           display.write(62);
-        } else if (currentModeSweep == 1) {
+          display.fillRect(0, 50, 6, 8, BLACK);
+          display.display();
+        break;
+        case FREQUENCY:
           display.setCursor(0,50);
           display.write(62);
-        }
-        display.display();
-      break;
-      case LOCK:
-        display.setTextSize(1);
-        display.setTextColor(WHITE);
-        display.clearDisplay();
-        display.setCursor(15,8);
-        display.print("Modo:Travamento");
-        display.drawLine(15, 17, 15+15*6, 17, WHITE);
-        display.setCursor(15,20);
-        display.print("Step:");
-        display.print(step);
-        display.setCursor(15,32);
-        display.print("Pico:");
-        display.print(currentPeakIndex+1);
-        display.setCursor(15,44);
-        display.print("Amostras media:");
-        display.print(numReadings);
+          display.fillRect(0, 30, 6, 8, BLACK);
+        break;
+      }
+      
+      display.display();
+    }
+    
+    if (modeButton == true) {
+      modeButton = false;
+      
+      switch (currentSystemMode) {
+        case SWEEP:
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.clearDisplay();
+          display.setCursor(15,8);
+          display.print("Modo:Varredura");
+          display.drawLine(15, 17, 15+14*6, 17, WHITE);
+          display.setCursor(15,30);
+          display.print("Amplitude:");
+          display.print(amp);
+          display.print("V:");
+          display.setCursor(15,50);
+          display.print("Frequencia:");
+          display.print(frequency);
+          display.print("Hz");
+        
+          if (currentModeSweep == 0) {
+            display.setCursor(0,30);
+            display.write(62);
+          }
+          else if (currentModeSweep == 1) {
+            display.setCursor(0,50);
+            display.write(62);
+          }
+        
+          display.display();
+        break;
+        case LOCK:
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.clearDisplay();
+          display.setCursor(15,8);
+          display.print("Modo:Travamento");
+          display.drawLine(15, 17, 15+15*6, 17, WHITE);
+          display.setCursor(15,20);
+          display.print("Step:");
+          display.print(step);
+          display.setCursor(15,32);
+          display.print("Pico:");
+          display.print(currentPeakIndex+1);
+          display.setCursor(15,44);
+          display.print("Amostras media:");
+          display.print(numReadings);
+        
         switch (currentModeLock) {
           case STEP:
             display.setCursor(0,20);
@@ -371,17 +388,20 @@ void loop() {
             display.write(62);
           break;
         }
+
         display.display();
-      break;} 
+        break;
+      }
     }
     cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
+    
     while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
       cycleEndTime = micros();
     }
-    dac_output_voltage(dacChannel, value); // atualiza o valor na saída
 
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  } else if (currentSystemMode == LOCK) {
+    dac_output_voltage(dacChannel, value); // atualiza o valor na saída
+  }
+  else if (currentSystemMode == LOCK) {
     //Calcula o novo valor a ser passado para o PZT
     value += direction*step;
     dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
@@ -390,158 +410,170 @@ void loop() {
     long adcSum = 0;
     for (int i = 0; i < numReadings; i++) {
       adcSum += adc1_get_raw(adcChannel);
-      delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar leituras muito rápidas
+      delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar bug de leituras muito rápidas
     }
+
     int averageAdcValue = adcSum / numReadings;
 
     // Executa a comparação e ajuste de direção caso necessário
     if (averageAdcValue > lastAdcValue) {
       direction = direction;
-    } else if ( averageAdcValue < lastAdcValue) {
+    }
+    else if ( averageAdcValue < lastAdcValue) {
       direction = -direction;
     }
 
     lastAdcValue = averageAdcValue; // Atualiza a variável de última leitura do ADC 
 
-    //Atualizações do display após interrupções:
-    if(increaseButton == true) {
+    //Atualizacoes do display apos interrupcoes
+    if (increaseButton == true) {
       increaseButton = false;
       switch (currentModeLock) {
-      case STEP:
-        display.fillRect(15, 20, 100, 8, BLACK);
-        display.setCursor(15,20);
-        display.print("Step:");
-        display.print(step);
+        case STEP:
+          display.fillRect(15, 20, 100, 8, BLACK);
+          display.setCursor(15,20);
+          display.print("Step:");
+          display.print(step);
         break;
-      case PEAK:
-        display.fillRect(15, 32, 100, 8, BLACK);
-        display.setCursor(15,32);
-        display.print("Pico:");
-        display.print(currentPeakIndex+1);
+        case PEAK:
+          display.fillRect(15, 32, 100, 8, BLACK);
+          display.setCursor(15,32);
+          display.print("Pico:");
+          display.print(currentPeakIndex+1);
         break;
-      case AMOSTRAS:
-        display.fillRect(15, 44, 100, 8, BLACK);
-        display.setCursor(15,44);
-        display.print("Amostras media:");
-        display.print(numReadings);
+        case AMOSTRAS:
+          display.fillRect(15, 44, 100, 8, BLACK);
+          display.setCursor(15,44);
+          display.print("Amostras media:");
+          display.print(numReadings);
         break;
       }
+
       display.display();
     }
-    if(decreaseButton == true) {
+    if (decreaseButton == true) {
       decreaseButton = false;
-      switch (currentModeLock) {
-      case STEP:
-        display.fillRect(15, 20, 100, 8, BLACK);
-        display.setCursor(15,20);
-        display.print("Step:");
-        display.print(step);
-        break;
-      case PEAK:
-        display.fillRect(15, 32, 100, 8, BLACK);
-        display.setCursor(15,32);
-        display.print("Pico:");
-        display.print(currentPeakIndex+1);
-        break;
-      case AMOSTRAS:
-        display.fillRect(15, 44, 100, 8, BLACK);
-        display.setCursor(15,44);
-        display.print("Amostras media:");
-        display.print(numReadings);
-        break;
-      }
-      display.display();
-    }
-    if(optionButton == true) {
-      optionButton = false;
-      switch (currentModeLock) {
-      case STEP:
-        display.setCursor(0,20);
-        display.write(62);
-        display.fillRect(0, 32, 6, 8, BLACK);
-        display.fillRect(0, 44, 6, 8, BLACK);
-        display.fillRect(0, 56, 6, 8, BLACK);
-        display.display();
-        break;
-      case PEAK:
-        display.setCursor(0,32);
-        display.write(62);
-        display.fillRect(0, 20, 6, 8, BLACK);
-        display.fillRect(0, 44, 6, 8, BLACK);
-        display.fillRect(0, 56, 6, 8, BLACK);
-        break;
-      case AMOSTRAS:
-        display.setCursor(0,44);
-        display.write(62);
-        display.fillRect(0, 20, 6, 8, BLACK);
-        display.fillRect(0, 32, 6, 8, BLACK);
-        display.fillRect(0, 56, 6, 8, BLACK);
-        break;
-      }
-      display.display();
-    }
-    if(modeButton == true) {
-      modeButton = false;
-      switch (currentSystemMode) {
-      case SWEEP:
-        display.setTextSize(1);
-        display.setTextColor(WHITE);
-        display.clearDisplay();
-        display.setCursor(15,10);
-        display.print("Modo:Varredura");
-        display.drawLine(15, 19, 15+14*6, 19, WHITE);
-        display.setCursor(15,30);
-        display.print("Amplitude:");
-        display.print(amp);
-        display.print("V:");
-        display.setCursor(15,50);
-        display.print("Frequencia:");
-        display.print(frequency);
-        display.print("Hz");
-        if (currentModeSweep == 0) {
-          display.setCursor(0,30);
-          display.write(62);
-        } else if (currentModeSweep == 1) {
-          display.setCursor(0,50);
-          display.write(62);
-        }
-        display.display();
-      break;
-      case LOCK:
-        display.setTextSize(1);
-        display.setTextColor(WHITE);
-        display.clearDisplay();
-        display.setCursor(15,8);
-        display.print("Modo:Travamento");
-        display.drawLine(15, 17, 15+15*6, 17, WHITE);
-        display.setCursor(15,20);
-        display.print("Step:");
-        display.print(step);
-        display.setCursor(15,32);
-        display.print("Pico:");
-        display.print(currentPeakIndex+1);
-        display.setCursor(15,44);
-        display.print("Amostras media:");
-        display.print(numReadings);
-        switch (currentModeLock) {
-          case STEP:
-            display.setCursor(0,20);
-            display.write(62);
-          break;
-          case PEAK:
-            display.setCursor(0,32);
-            display.write(62);
-          break;
-          case AMOSTRAS:
-            display.setCursor(0,44);
-            display.write(62);
-          break;
-        }
-        display.display();
-      break;
-      } 
       
+      switch (currentModeLock) {
+        case STEP:
+          display.fillRect(15, 20, 100, 8, BLACK);
+          display.setCursor(15,20);
+          display.print("Step:");
+          display.print(step);
+        break;
+        case PEAK:
+          display.fillRect(15, 32, 100, 8, BLACK);
+          display.setCursor(15,32);
+          display.print("Pico:");
+          display.print(currentPeakIndex+1);
+        break;
+        case AMOSTRAS:
+          display.fillRect(15, 44, 100, 8, BLACK);
+          display.setCursor(15,44);
+          display.print("Amostras media:");
+          display.print(numReadings);
+        break;
+      }
+
+      display.display();
+    }
+    if (optionButton == true) {
+      optionButton = false;
+      
+      switch (currentModeLock) {
+        case STEP:
+          display.setCursor(0,20);
+          display.write(62);
+          display.fillRect(0, 32, 6, 8, BLACK);
+          display.fillRect(0, 44, 6, 8, BLACK);
+          display.fillRect(0, 56, 6, 8, BLACK);
+          display.display();
+        break;
+        case PEAK:
+          display.setCursor(0,32);
+          display.write(62);
+          display.fillRect(0, 20, 6, 8, BLACK);
+          display.fillRect(0, 44, 6, 8, BLACK);
+          display.fillRect(0, 56, 6, 8, BLACK);
+        break;
+        case AMOSTRAS:
+          display.setCursor(0,44);
+          display.write(62);
+          display.fillRect(0, 20, 6, 8, BLACK);
+          display.fillRect(0, 32, 6, 8, BLACK);
+          display.fillRect(0, 56, 6, 8, BLACK);
+        break;
+      }
+
+      display.display();
+    }
+
+    if (modeButton == true) {
+      modeButton = false;
+      
+      switch (currentSystemMode) {
+        case SWEEP:
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.clearDisplay();
+          display.setCursor(15,10);
+          display.print("Modo:Varredura");
+          display.drawLine(15, 19, 15+14*6, 19, WHITE);
+          display.setCursor(15,30);
+          display.print("Amplitude:");
+          display.print(amp);
+          display.print("V:");
+          display.setCursor(15,50);
+          display.print("Frequencia:");
+          display.print(frequency);
+          display.print("Hz");
+        
+          if (currentModeSweep == 0) {
+            display.setCursor(0,30);
+            display.write(62);
+          }
+          else if (currentModeSweep == 1) {
+            display.setCursor(0,50);
+            display.write(62);
+          }
+        
+          display.display();
+        break;
+        case LOCK:
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.clearDisplay();
+          display.setCursor(15,8);
+          display.print("Modo:Travamento");
+          display.drawLine(15, 17, 15+15*6, 17, WHITE);
+          display.setCursor(15,20);
+          display.print("Step:");
+          display.print(step);
+          display.setCursor(15,32);
+          display.print("Pico:");
+          display.print(currentPeakIndex+1);
+          display.setCursor(15,44);
+          display.print("Amostras media:");
+          display.print(numReadings);
+        
+          switch (currentModeLock) {
+            case STEP:
+              display.setCursor(0,20);
+              display.write(62);
+            break;
+            case PEAK:
+              display.setCursor(0,32);
+              display.write(62);
+            break;
+            case AMOSTRAS:
+              display.setCursor(0,44);
+              display.write(62);
+            break;
+          }
+        
+          display.display();
+        break;
+      } 
     }
   }
 }
-
