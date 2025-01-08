@@ -10,59 +10,60 @@
 #define LARGURA_OLED 128
 #define ALTURA_OLED 64
 #define RESET_OLED -1
- 
+
 Adafruit_SSD1306 display(LARGURA_OLED, ALTURA_OLED, &Wire, RESET_OLED);
 
-// CONSTANTES  E  DEFINIÇÕES
-
-// detalhes: o DAC (Saída para o PZT) tem resolução de 8 bits, de 0 à 255
-// já o ADC (leitura do fotodetector) tem resolução de 12 bits, de 0 à 4095
+//--------------------------------------------------------------------------------------------
+// o DAC (saida para o PZT) tem resolucao de 8 bits (0 a 255)
+// ja o ADC (leitura do fotodetector) tem resolucao de 12 bits (0 a 4095)
 
 const dac_channel_t dacChannel = DAC_CHANNEL_1;   // Canal 1 do DAC (GPIO25)
 const adc1_channel_t adcChannel = ADC1_CHANNEL_0; // Canal 0 do ADC (GPIO36)
 
-int resolution = 232;               // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
-int resolutionmax = 255;           // Resolução de 8 bits
-int delayUs = 20;                   // Delay em microssegundos entre as amostras
-int numReadings = 10;          // Número de leituras para calcular a média
-const float referenceVoltage = 3.3; // Tensão de referência (em volts)
-unsigned long cycleStartTime = 0;   // Armazena o tempo de início do ciclo
-unsigned long cycleEndTime = 0;     // Armazena o tempo de fim do ciclo
-int frequency = 10;               // Inicializa a frequência do sinal em 10Hz, armazena a frequência
-float amp_step = referenceVoltage/resolutionmax; // Dado necessário para o cálculo da mostra da amplitude
-int step = 1;            // Passo para a rapidez do travamento
-int averageAdcValue = 0; // Armazena o valor lido no ADC
-int lastAdcValue = 0;    // Armazena o último valor lido no ADC
-float amp = amp_step*resolution; //Calcula a amplitude
-int direction = 1; // Variável para direcionar a aproximação do pico
-float  value = 0;    // Variável de saída para o DAC
-int delayInterrupt = 250;
-double waiting_time = 1000000/(frequency*resolution*2); //Calcula o periodo esperado dado a frequência escolhida em microsegundos
-
-const int buttonPin = 15;    // GPIO8 para alternar modos
-const int increasePin = 4;   // GPIO4 para aumentar valores
-const int decreasePin = 17;  // GPIO17 para diminuir valores
-const int modeSwitchPin = 2; // GPIO2 para alternar entre varredura e travamento
+const int buttonPin = 15;      // GPIO8 para alternar modos
+const int increasePin = 4;     // GPIO4 para aumentar valores
+const int decreasePin = 17;    // GPIO17 para diminuir valores
+const int modeSwitchPin = 2;   // GPIO2 para alternar entre varredura e travamento
+const int peakThreshold = 40;  // Limiar para detectar picos = 50mV 
+const int resetThreshold = 20; // Limiar para redefinir a deteccao de picos = 25mV
 
 bool optionButton = false;
 bool increaseButton = false;
 bool decreaseButton = false;
 bool modeButton = false;
+bool detectingPeak = false;
 
-enum ModeSweep { AMPLITUDE, FREQUENCY }; // Vetor opções de configuração no modo de varredura
-ModeSweep currentModeSweep = AMPLITUDE;       // e inicializa na amplitude
-enum ModeLock { STEP, PEAK, AMOSTRAS };            // Vetor opções de configuração no modo de travamento
-ModeLock currentModeLock = STEP;             // e inicializa no step
-enum SystemMode { SWEEP, LOCK };         // Vetor dos modos de operação do sistema
-SystemMode currentSystemMode = SWEEP;    // e inicializa na varredura
+float value = 0;                                 // Variavel de saida para o DAC
+const float referenceVoltage = 3.3;              // Tensao de referencia (volts)
+unsigned long cycleStartTime = 0;                // Armazena o tempo de inicio do ciclo
+unsigned long cycleEndTime = 0;                  // Armazena o tempo de fim do ciclo
+int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
+int resolutionmax = 255;                         // Resolucao de 8 bits
+int delayUs = 20;                                // Delay em microssegundos entre as amostras
+int numReadings = 10;                            // Numero de leituras para calcular a media
+int frequency = 10;                              // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
+int step = 1;                                    // Passo para a rapidez do travamento
+int averageAdcValue = 0;                         // Armazena o valor lido no ADC
+int lastAdcValue = 0;                            // Armazena o ultimo valor lido no ADC
+int direction = 1;                               // Variavel para direcionar a aproximacao do pico
+int targetValue = 0;                             // Armazena o valor do  DAC que representa o inicio do pico de interesse
+int currentPeakIndex = 0;                        // Indice do pico atual
+int delayInterrupt = 250;
 
-int targetValue = 0; // Armazena o valor do  DAC que representa o inicio do pico de interesse
-const int peakThreshold = 40; // Limiar para detectar picos = 50mV 
-const int resetThreshold = 20; // Limiar para redefinir a detecção de picos = 25mV
-bool detectingPeak = false;     // Flag para indicação de detecção de picos
-std::vector<unsigned int> peaks_place;  // Vetor para armazenar o valor de pzt respectivos para os picos
-int currentPeakIndex = 0;       // Índice do pico atual
+std::vector<unsigned int> peaks_place;           // Vetor para armazenar o valor de pzt respectivos para os picos
 
+float amp_step = referenceVoltage / resolutionmax;                            // Dado necessario para o calculo da mostra da amplitude
+float amp = amp_step * triangularSignalResolution;                            // Calcula a amplitude
+double waiting_time = 1000000 / (frequency * triangularSignalResolution * 2); // Calcula o periodo esperado dado a frequencia escolhida em microsegundos
+
+enum ModeSweep { AMPLITUDE, FREQUENCY };
+enum ModeLock { STEP, PEAK, AMOSTRAS };
+enum SystemMode { SWEEP, LOCK };
+ModeSweep currentModeSweep = AMPLITUDE;
+ModeLock currentModeLock = STEP;
+SystemMode currentSystemMode = SWEEP;
+
+//--------------------------------------------------------------------------------------------
 // Funcao de interrupcao do botao "opcoes de configuracao"
 void IRAM_ATTR handleButtonPin() {
   static unsigned long lastInterruptTime = 0;
@@ -88,16 +89,16 @@ void IRAM_ATTR handleIncreasePin() {
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
       case AMPLITUDE:
-        resolution += 4; // Salto de aprox 50mV
-        if (resolution > 255) resolution = 255;
-        amp = amp_step*resolution;
+        triangularSignalResolution += 4; // Salto de aprox 50mV
+        if (triangularSignalResolution > 255) triangularSignalResolution = 255;
+        amp = amp_step*triangularSignalResolution;
         break;
       case FREQUENCY:
         frequency += 5;
         if (frequency > 50) frequency = 50;
         break;
       }
-    waiting_time = 1000000/(frequency*resolution*2);
+    waiting_time = 1000000/(frequency*triangularSignalResolution*2);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -129,16 +130,16 @@ void IRAM_ATTR handleDecreasePin() {
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
       case AMPLITUDE:
-        resolution -= 4; // Salto de aprox 50mV
-        if (resolution < 12) resolution = 12; // Limite  mínimo de amplitude de 150mV
-        amp = amp_step*resolution;
+        triangularSignalResolution -= 4; // Salto de aprox 50mV
+        if (triangularSignalResolution < 12) triangularSignalResolution = 12; // Limite  mínimo de amplitude de 150mV
+        amp = amp_step*triangularSignalResolution;
         break;
       case FREQUENCY:
         frequency -= 5;
         if (frequency < 5) frequency = 5;
         break;
       }
-    waiting_time = 1000000/(frequency*resolution*2);
+    waiting_time = 1000000/(frequency*triangularSignalResolution*2);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
@@ -185,6 +186,8 @@ void IRAM_ATTR handleModeSwitchPin() {
   lastInterruptTime = interruptTime;
 }
 
+//--------------------------------------------------------------------------------------------
+
 void setup() {
   Serial.begin(115200);
 
@@ -229,13 +232,15 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(modeSwitchPin), handleModeSwitchPin, FALLING);
 }
 
+//--------------------------------------------------------------------------------------------
+
 void loop() {
   if (currentSystemMode == SWEEP) {
     cycleStartTime = micros(); //Atualiza o valor de início da próxima iteração
     value += direction;
 
-    if (value >= resolution) {
-      value = resolution;
+    if (value >= triangularSignalResolution) {
+      value = triangularSignalResolution;
       direction = -1;
     }
     else if (value <= 0) {
