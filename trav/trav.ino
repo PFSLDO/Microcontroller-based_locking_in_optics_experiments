@@ -1,9 +1,9 @@
-#include <adafruit_gfx.h>
-#include <adafruit_ssd1306.h>
+#include </Users/pfsldo/Documents/Arduino/libraries/Adafruit_GFX_Library/Adafruit_GFX.h>
+#include </Users/pfsldo/Documents/Arduino/libraries/Adafruit_SSD1306/Adafruit_SSD1306.h>
 #include <driver/adc.h>
 #include <driver/dac.h>
 #include <esp_adc_cal.h>
-#include <spo.h>
+#include <spi.h>
 #include <vector>
 #include <wire.h>
 
