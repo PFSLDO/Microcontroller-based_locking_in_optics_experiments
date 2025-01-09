@@ -33,10 +33,6 @@ bool decreaseButton = false;
 bool modeButton = false;
 bool detectingPeak = false;
 
-float value = 0;                                 // Variavel de saida para o DAC
-const float referenceVoltage = 3.3;              // Tensao de referencia (volts)
-unsigned long cycleStartTime = 0;                // Armazena o tempo de inicio do ciclo
-unsigned long cycleEndTime = 0;                  // Armazena o tempo de fim do ciclo
 int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
 int resolutionmax = 255;                         // Resolucao de 8 bits
 int delayUs = 20;                                // Delay em microssegundos entre as amostras
@@ -50,11 +46,16 @@ int targetValue = 0;                             // Armazena o valor do  DAC que
 int currentPeakIndex = 0;                        // Indice do pico atual
 int delayInterrupt = 250;
 
-std::vector<unsigned int> peaks_place;           // Vetor para armazenar o valor de pzt respectivos para os picos
+float value = 0;                                 // Variavel de saida para o DAC
+const float referenceVoltage = 3.3;              // Tensao de referencia (volts)
+unsigned long cycleStartTime = 0;                // Armazena o tempo de inicio do ciclo
+unsigned long cycleEndTime = 0;                  // Armazena o tempo de fim do ciclo
 
 float amp_step = referenceVoltage / resolutionmax;                            // Dado necessario para o calculo da mostra da amplitude
 float amp = amp_step * triangularSignalResolution;                            // Calcula a amplitude
 double waiting_time = 1000000 / (frequency * triangularSignalResolution * 2); // Calcula o periodo esperado dado a frequencia escolhida em microsegundos
+
+std::vector<unsigned int> peaks_place;           // Vetor para armazenar o valor de pzt respectivos para os picos
 
 enum ModeSweep { AMPLITUDE, FREQUENCY };
 enum ModeLock { STEP, PEAK, AMOSTRAS };
@@ -68,8 +69,10 @@ SystemMode currentSystemMode = SWEEP;
 void IRAM_ATTR handleButtonPin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
+
   if (interruptTime - lastInterruptTime > delayInterrupt) {
     optionButton = true;
+
     if (currentSystemMode == SWEEP) { 
       currentModeSweep = static_cast<ModeSweep>((currentModeSweep + 1) % 2);  // Alterna entre AMPLITUDE, FREQUENCY
     }
@@ -77,6 +80,7 @@ void IRAM_ATTR handleButtonPin() {
       currentModeLock = static_cast<ModeLock>((currentModeLock + 1) % 3);  // Alterna entre PEAK, STEP, AMOSTRAS
     }
   }
+
   lastInterruptTime = interruptTime;
 }
 
@@ -84,21 +88,32 @@ void IRAM_ATTR handleButtonPin() {
 void IRAM_ATTR handleIncreasePin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
+
   if (interruptTime - lastInterruptTime > delayInterrupt) {
     increaseButton = true;
+
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        triangularSignalResolution += 4; // Salto de aprox 50mV
-        if (triangularSignalResolution > 255) triangularSignalResolution = 255;
-        amp = amp_step*triangularSignalResolution;
+        case AMPLITUDE:
+          triangularSignalResolution += 4; // Salto de aprox 50mV
+
+          if (triangularSignalResolution > 255) {
+            triangularSignalResolution = 255;
+          }
+
+          amp = amp_step * triangularSignalResolution;
         break;
-      case FREQUENCY:
-        frequency += 5;
-        if (frequency > 50) frequency = 50;
+        case FREQUENCY:
+          frequency += 5;
+
+          if (frequency > 50) {
+            frequency = 50;
+          }
+
         break;
       }
-    waiting_time = 1000000/(frequency*triangularSignalResolution*2);
+
+      waiting_time = 1000000/(frequency*triangularSignalResolution*2);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -108,16 +123,17 @@ void IRAM_ATTR handleIncreasePin() {
             targetValue = peaks_place[currentPeakIndex];
             value = targetValue;
           }
-          break;
+        break;
         case STEP:
-          step++;
-          break;
+          step++;  
+        break;
         case AMOSTRAS:
-          numReadings++;
-          break;
+          numReadings++;  
+        break;
       }
     }
   }
+
   lastInterruptTime = interruptTime;
 }
 
@@ -125,42 +141,55 @@ void IRAM_ATTR handleIncreasePin() {
 void IRAM_ATTR handleDecreasePin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
+
   if (interruptTime - lastInterruptTime > delayInterrupt) {
     decreaseButton = true;
+
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        triangularSignalResolution -= 4; // Salto de aprox 50mV
-        if (triangularSignalResolution < 12) triangularSignalResolution = 12; // Limite  mínimo de amplitude de 150mV
-        amp = amp_step*triangularSignalResolution;
+        case AMPLITUDE:
+          triangularSignalResolution -= 4; // Salto de aprox 50mV
+          if (triangularSignalResolution < 12) { // Limite  minimo de amplitude de 150mV
+            triangularSignalResolution = 12;
+          }
+
+          amp = amp_step * triangularSignalResolution;
         break;
-      case FREQUENCY:
-        frequency -= 5;
-        if (frequency < 5) frequency = 5;
+        case FREQUENCY:
+          frequency -= 5;
+
+          if (frequency < 5) {
+            frequency = 5;
+          }
         break;
       }
-    waiting_time = 1000000/(frequency*triangularSignalResolution*2);
+      
+      waiting_time = 1000000/(frequency*triangularSignalResolution*2);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
-      case PEAK:
-        if (!peaks_place.empty()) {
-          currentPeakIndex = (currentPeakIndex - 1 + peaks_place.size()) % peaks_place.size();
-          targetValue = peaks_place[currentPeakIndex];
-          value = targetValue;
-        }
+        case PEAK:
+          if (!peaks_place.empty()) {
+            currentPeakIndex = (currentPeakIndex - 1 + peaks_place.size()) % peaks_place.size();
+            targetValue = peaks_place[currentPeakIndex];
+            value = targetValue;
+          }
         break;
-      case STEP:
-        step--;
-        if (step < 1) step = 1;
+        case STEP:
+          step--;
+          if (step < 1) step = 1;
         break;
-      case AMOSTRAS:
-        numReadings--;
-        if (numReadings < 1) numReadings = 1;
+        case AMOSTRAS:
+          numReadings--;
+          
+          if (numReadings < 1) {
+            numReadings = 1;
+          }
         break;
       }
     }
   }
+
   lastInterruptTime = interruptTime;
 }
 
@@ -168,21 +197,24 @@ void IRAM_ATTR handleDecreasePin() {
 void IRAM_ATTR handleModeSwitchPin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
+
   if (interruptTime - lastInterruptTime > delayInterrupt) {
     modeButton = true;
     currentSystemMode = static_cast<SystemMode>((currentSystemMode + 1) % 2);  // Alterna entre SWEEP e LOCK
+
     switch (currentSystemMode) {
       case SWEEP:
         value = 0;
         direction = 1;
-        break;
+      break;
       case LOCK:
         value = targetValue; // Inicia o sistema no início do pico escolhido
         lastAdcValue = averageAdcValue - 1; // 
         direction = 1;
-        break;
+      break;
     }
   }
+
   lastInterruptTime = interruptTime;
 }
 
@@ -216,12 +248,12 @@ void setup() {
 
   // Configura o ADC
   adc1_config_width(ADC_WIDTH_BIT_12);
-  adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuação
+  adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuacao
 
   // Inicializa o valor do DAC
   dac_output_voltage(dacChannel, 0);
 
-  // Configura os botoes com interrupções
+  // Configura os botoes com interrupcoes
   pinMode(increasePin, INPUT_PULLUP);
   pinMode(decreasePin, INPUT_PULLUP);
   pinMode(modeSwitchPin, INPUT_PULLUP);
@@ -236,7 +268,7 @@ void setup() {
 
 void loop() {
   if (currentSystemMode == SWEEP) {
-    cycleStartTime = micros(); //Atualiza o valor de início da próxima iteração
+    cycleStartTime = micros(); //Atualiza o valor de inicio da proxima iteracao
     value += direction;
 
     if (value >= triangularSignalResolution) {
@@ -398,9 +430,9 @@ void loop() {
         break;
       }
     }
-    cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
+    cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteracao
     
-    while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
+    while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se nao ele continua preso no looping ate dar o tempo
       cycleEndTime = micros();
     }
 
@@ -411,16 +443,16 @@ void loop() {
     value += direction*step;
     dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
 
-    //Verifica a resposta do sistema, fazendo uma média na leitura para filtrar o ruído
+    //Verifica a resposta do sistema, fazendo uma media na leitura para filtrar o ruído
     long adcSum = 0;
     for (int i = 0; i < numReadings; i++) {
       adcSum += adc1_get_raw(adcChannel);
-      delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar bug de leituras muito rápidas
+      delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar bug de leituras muito rapidas
     }
 
     int averageAdcValue = adcSum / numReadings;
 
-    // Executa a comparação e ajuste de direção caso necessário
+    // Executa a comparacao e ajuste de direcao caso necessario
     if (averageAdcValue > lastAdcValue) {
       direction = direction;
     }
@@ -428,7 +460,7 @@ void loop() {
       direction = -direction;
     }
 
-    lastAdcValue = averageAdcValue; // Atualiza a variável de última leitura do ADC 
+    lastAdcValue = averageAdcValue; // Atualiza a variavel de ultima leitura do ADC 
 
     //Atualizacoes do display apos interrupcoes
     if (increaseButton == true) {
