@@ -7,8 +7,8 @@
 #include <vector>
 #include <wire.h>
 
-#define LARGURA_OLED 128
 #define ALTURA_OLED 64
+#define LARGURA_OLED 128
 #define RESET_OLED -1
 #define MCP4725_ADDR 0x60
 #define OLED_ADDR 0x3C
@@ -37,7 +37,7 @@ bool modeButton = false;
 bool detectingPeak = false;
 
 int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
-int resolutionmax = 255;                         // Resolucao de 8 bits
+int resolutionmax = 255;                         // Resolucao de 8 bits MUADR AQUI?
 int delayUs = 20;                                // Delay em microssegundos entre as amostras
 int numReadings = 10;                            // Numero de leituras para calcular a media
 int frequency = 10;                              // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
@@ -245,7 +245,7 @@ void setup() {
 
   Wire.begin();
 
-  if (!display.begin(SSD1306_I2C_ADDRESS, OLED_ADDR)) {
+  if (!display.begin(OLED_ADDR)) {
     Serial.println(F("Falha ao inicializar o display OLED"));
     for (;;); // Entra em loop infinito em caso de erro
   }
