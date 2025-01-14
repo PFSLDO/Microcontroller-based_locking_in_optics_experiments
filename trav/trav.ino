@@ -1,5 +1,5 @@
-#include </Users/pfsldo/Documents/Arduino/libraries/Adafruit_GFX_Library/Adafruit_GFX.h>
-#include </Users/pfsldo/Documents/Arduino/libraries/Adafruit_SSD1306/Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <driver/adc.h>
 #include <driver/dac.h>
 #include <esp_adc_cal.h>
@@ -10,11 +10,14 @@
 #define LARGURA_OLED 128
 #define ALTURA_OLED 64
 #define RESET_OLED -1
+#define MCP4725_ADDR 0x60
+#define OLED_ADDR 0x3C
 
 Adafruit_SSD1306 display(LARGURA_OLED, ALTURA_OLED, &Wire, RESET_OLED);
 
 //--------------------------------------------------------------------------------------------
 // o DAC (saida para o PZT) tem resolucao de 8 bits (0 a 255)
+// agora o DAC tem 12 bits (0 a 4096)
 // ja o ADC (leitura do fotodetector) tem resolucao de 12 bits (0 a 4095)
 
 const dac_channel_t dacChannel = DAC_CHANNEL_1;   // Canal 1 do DAC (GPIO25)
@@ -84,6 +87,8 @@ void IRAM_ATTR handleButtonPin() {
   lastInterruptTime = interruptTime;
 }
 
+//--------------------------------------------------------------------------------------------
+
 // Funcao de interrupcao do botao "incremento+"
 void IRAM_ATTR handleIncreasePin() {
   static unsigned long lastInterruptTime = 0;
@@ -136,6 +141,8 @@ void IRAM_ATTR handleIncreasePin() {
 
   lastInterruptTime = interruptTime;
 }
+
+//--------------------------------------------------------------------------------------------
 
 // Funcao de interrupcao do botao "incremento-"
 void IRAM_ATTR handleDecreasePin() {
@@ -193,6 +200,8 @@ void IRAM_ATTR handleDecreasePin() {
   lastInterruptTime = interruptTime;
 }
 
+//--------------------------------------------------------------------------------------------
+
 // Funcao de interrupcao do botao "modo do sistema"
 void IRAM_ATTR handleModeSwitchPin() {
   static unsigned long lastInterruptTime = 0;
@@ -220,11 +229,29 @@ void IRAM_ATTR handleModeSwitchPin() {
 
 //--------------------------------------------------------------------------------------------
 
+// Função para configurar o valor do DAC
+void setDACValue(uint16_t value) {
+  Wire.beginTransmission(MCP4725_ADDR);
+  Wire.write(0x40);  // Comando de escrita rápida
+  Wire.write(value >> 4); //A operacao desloca os bits 4 posicoes para a direita, descartando os 4 bits menos significativos
+  Wire.write((value & 0x0F) << 4); //Envia os 4 bits menos significativos do valor de 12 bits
+  Wire.endTransmission();
+}
+
+//--------------------------------------------------------------------------------------------
+
 void setup() {
   Serial.begin(115200);
 
+  Wire.begin();
+
+  if (!display.begin(SSD1306_I2C_ADDRESS, OLED_ADDR)) {
+    Serial.println(F("Falha ao inicializar o display OLED"));
+    for (;;); // Entra em loop infinito em caso de erro
+  }
+
   // configura o display oled
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.clearDisplay();
@@ -251,7 +278,8 @@ void setup() {
   adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuacao
 
   // Inicializa o valor do DAC
-  dac_output_voltage(dacChannel, 0);
+  //dac_output_voltage(dacChannel, 0);
+  setDACValue(0);
 
   // Configura os botoes com interrupcoes
   pinMode(increasePin, INPUT_PULLUP);
@@ -436,12 +464,14 @@ void loop() {
       cycleEndTime = micros();
     }
 
-    dac_output_voltage(dacChannel, value); // atualiza o valor na saída
+    //dac_output_voltage(dacChannel, value); // atualiza o valor na saída
+    setDACValue(value);
   }
   else if (currentSystemMode == LOCK) {
     //Calcula o novo valor a ser passado para o PZT
     value += direction*step;
-    dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
+    //dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
+    setDACValue(value);
 
     //Verifica a resposta do sistema, fazendo uma media na leitura para filtrar o ruído
     long adcSum = 0;
