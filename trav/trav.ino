@@ -37,7 +37,7 @@ bool modeButton = false;
 bool detectingPeak = false;
 
 int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
-int resolutionmax = 255;                         // Resolucao de 8 bits MUADR AQUI?
+int resolutionmax = 255;                         // Resolucao de 8 bits MUDAR AQUI?
 int delayUs = 20;                                // Delay em microssegundos entre as amostras
 int numReadings = 10;                            // Numero de leituras para calcular a media
 int frequency = 10;                              // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
