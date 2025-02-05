@@ -244,11 +244,6 @@ void setup() {
 
   Wire.begin();
 
-  if (!display.begin(OLED_ADDR)) {
-    Serial.println(F("Falha ao inicializar o display OLED"));
-    for (;;); // Entra em loop infinito em caso de erro
-  }
-
   // configura o display oled
   display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
   display.setTextSize(1);
@@ -325,6 +320,9 @@ void loop() {
     }
 
     //Atualizacoes do display apos interrupcoes
+    //Wire.begin();
+    //display.begin(OLED_ADDR);
+
     if (increaseButton == true) {
       increaseButton = false;
       
@@ -370,7 +368,7 @@ void loop() {
       
       display.display();
     }
-    if  (optionButton == true) {
+    if (optionButton == true) {
       optionButton = false;
       
       switch (currentModeSweep) {
@@ -457,6 +455,9 @@ void loop() {
         break;
       }
     }
+
+    //display.endTransmission();
+
     cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteracao
     
     while(cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se nao ele continua preso no looping ate dar o tempo
@@ -490,8 +491,12 @@ void loop() {
     lastAdcValue = averageAdcValue; // Atualiza a variavel de ultima leitura do ADC 
 
     //Atualizacoes do display apos interrupcoes
+    //Wire.begin();
+    //display.begin(OLED_ADDR);
+
     if (increaseButton == true) {
       increaseButton = false;
+
       switch (currentModeLock) {
         case STEP:
           display.fillRect(15, 20, 100, 8, BLACK);
@@ -515,6 +520,7 @@ void loop() {
 
       display.display();
     }
+
     if (decreaseButton == true) {
       decreaseButton = false;
       
@@ -541,6 +547,7 @@ void loop() {
 
       display.display();
     }
+
     if (optionButton == true) {
       optionButton = false;
       
@@ -637,7 +644,9 @@ void loop() {
         
           display.display();
         break;
-      } 
+      }
     }
+
+    //display.endTransmission();
   }
 }
