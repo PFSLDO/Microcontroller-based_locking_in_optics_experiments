@@ -16,7 +16,6 @@
 Adafruit_SSD1306 display(LARGURA_OLED, ALTURA_OLED, &Wire, RESET_OLED);
 
 //--------------------------------------------------------------------------------------------
-// o DAC (saida para o PZT) tem resolucao de 8 bits (0 a 255)
 // agora o DAC tem 12 bits (0 a 4096)
 // ja o ADC (leitura do fotodetector) tem resolucao de 12 bits (0 a 4095)
 
@@ -37,7 +36,7 @@ bool modeButton = false;
 bool detectingPeak = false;
 
 int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
-int resolutionmax = 255;                         // Resolucao de 8 bits MUDAR AQUI?
+int resolutionmax = 4096;                        // Resolucao de 12 bits (mudamos aqui quandi trocamos o dac para 12 bits)
 int delayUs = 20;                                // Delay em microssegundos entre as amostras
 int numReadings = 10;                            // Numero de leituras para calcular a media
 int frequency = 10;                              // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
@@ -233,8 +232,8 @@ void IRAM_ATTR handleModeSwitchPin() {
 void setDACValue(uint16_t value) {
   Wire.beginTransmission(MCP4725_ADDR);
   Wire.write(0x40);  // Comando de escrita rápida
-  Wire.write(value >> 4); //A operacao desloca os bits 4 posicoes para a direita, descartando os 4 bits menos significativos
-  Wire.write((value & 0x0F) << 4); //Envia os 4 bits menos significativos do valor de 12 bits
+  Wire.write(value >> 4); // A operacao desloca os bits 4 posicoes para a direita, descartando os 4 bits menos significativos
+  Wire.write((value & 0x0F) << 4); // Envia os 4 bits menos significativos do valor de 12 bits
   Wire.endTransmission();
 }
 
@@ -271,7 +270,7 @@ void setup() {
   display.display();
 
   // Configura o DAC
-  dac_output_enable(dacChannel);
+  //dac_output_enable(dacChannel);
 
   // Configura o ADC
   adc1_config_width(ADC_WIDTH_BIT_12);
@@ -464,13 +463,11 @@ void loop() {
       cycleEndTime = micros();
     }
 
-    //dac_output_voltage(dacChannel, value); // atualiza o valor na saída
     setDACValue(value);
   }
   else if (currentSystemMode == LOCK) {
     //Calcula o novo valor a ser passado para o PZT
-    value += direction*step;
-    //dac_output_voltage(dacChannel, value); // Atualiza o valor na saída
+    value += direction * step;
     setDACValue(value);
 
     //Verifica a resposta do sistema, fazendo uma media na leitura para filtrar o ruído
