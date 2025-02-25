@@ -35,27 +35,30 @@ bool decreaseButton = false;
 bool modeButton = false;
 bool detectingPeak = false;
 
-int triangularSignalResolution = 232;            // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
-int resolutionmax = 4096;                        // Resolucao de 12 bits (mudamos aqui quandi trocamos o dac para 12 bits)
-int delayUs = 20;                                // Delay em microssegundos entre as amostras
-int numReadings = 10;                            // Numero de leituras para calcular a media
-int frequency = 10;                              // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
-int step = 1;                                    // Passo para a rapidez do travamento
-int averageAdcValue = 0;                         // Armazena o valor lido no ADC
-int lastAdcValue = 0;                            // Armazena o ultimo valor lido no ADC
-int direction = 1;                               // Variavel para direcionar a aproximacao do pico
-int targetValue = 0;                             // Armazena o valor do  DAC que representa o inicio do pico de interesse
-int currentPeakIndex = 0;                        // Indice do pico atual
+int resolutionmax = 4096;                                 // Resolucao de 12 bits (mudamos aqui quandi trocamos o dac para 12 bits)
+int triangularSignalResolution = resolutionmax * 3 / 3.3; // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
+int stepForAmpChanges = resolutionmax * 0.05 / 3.3;       // Calcula o valor em bits para usar como passos de acrescimento e decrescimo na amplitude pelos botoes
+int minVoltageValue = resolutionmax + 0.15 / 3.3;         // Valor minimo permitido na amplitude da tensao
+int numberOfStepsOnTriangSignal = triangularSignalResolution;
+int delayUs = 20;                                         // Delay em microssegundos entre as amostras
+int numReadings = 10;                                     // Numero de leituras para calcular a media
+int frequency = 10;                                       // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
+int step = 1;                                             // Passo para a rapidez do travamento
+int averageAdcValue = 0;                                  // Armazena o valor lido no ADC
+int lastAdcValue = 0;                                     // Armazena o ultimo valor lido no ADC
+int direction = 1;                                        // Variavel para direcionar a aproximacao do pico
+int targetValue = 0;                                      // Armazena o valor do  DAC que representa o inicio do pico de interesse
+int currentPeakIndex = 0;                                 // Indice do pico atual
 int delayInterrupt = 250;
 
-float value = 0;                                 // Variavel de saida para o DAC
+float value = 0;                                 // Variavel de saida para o DAC (PZT)
 const float referenceVoltage = 3.3;              // Tensao de referencia (volts)
 unsigned long cycleStartTime = 0;                // Armazena o tempo de inicio do ciclo
 unsigned long cycleEndTime = 0;                  // Armazena o tempo de fim do ciclo
 
 float amp_step = referenceVoltage / resolutionmax;                            // Dado necessario para o calculo da mostra da amplitude
 float amp = amp_step * triangularSignalResolution;                            // Calcula a amplitude
-double waiting_time = 1000000 / (frequency * triangularSignalResolution * 2); // Calcula o periodo esperado dado a frequencia escolhida em microsegundos
+double waiting_time = 1000000 / (frequency * numberOfStepsOnTriangSignal * 2); // Calcula o periodo esperado dado a frequencia escolhida em microsegundos
 
 std::vector<unsigned int> peaks_place;           // Vetor para armazenar o valor de pzt respectivos para os picos
 
@@ -99,10 +102,10 @@ void IRAM_ATTR handleIncreasePin() {
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
         case AMPLITUDE:
-          triangularSignalResolution += 4; // Salto de aprox 50mV
+          triangularSignalResolution += stepForAmpChanges; // Salto de aprox 50mV
 
-          if (triangularSignalResolution > 255) {
-            triangularSignalResolution = 255;
+          if (triangularSignalResolution > resolutionmax) {
+            triangularSignalResolution = resolutionmax;
           }
 
           amp = amp_step * triangularSignalResolution;
@@ -117,7 +120,7 @@ void IRAM_ATTR handleIncreasePin() {
         break;
       }
 
-      waiting_time = 1000000/(frequency*triangularSignalResolution*2);
+      waiting_time = 1000000 / (frequency * numberOfStepsOnTriangSignal * 2);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -154,9 +157,10 @@ void IRAM_ATTR handleDecreasePin() {
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
         case AMPLITUDE:
-          triangularSignalResolution -= 4; // Salto de aprox 50mV
-          if (triangularSignalResolution < 12) { // Limite  minimo de amplitude de 150mV
-            triangularSignalResolution = 12;
+          triangularSignalResolution -= stepForAmpChanges; // Salto de aprox 50mV
+
+          if (triangularSignalResolution < minVoltageValue) { // Limite  minimo de amplitude de 150mV
+            triangularSignalResolution = minVoltageValue;
           }
 
           amp = amp_step * triangularSignalResolution;
@@ -170,7 +174,7 @@ void IRAM_ATTR handleDecreasePin() {
         break;
       }
       
-      waiting_time = 1000000/(frequency*triangularSignalResolution*2);
+      waiting_time = 1000000 / (frequency * numberOfStepsOnTriangSignal * 2);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
@@ -368,6 +372,7 @@ void loop() {
       
       display.display();
     }
+
     if (optionButton == true) {
       optionButton = false;
       
