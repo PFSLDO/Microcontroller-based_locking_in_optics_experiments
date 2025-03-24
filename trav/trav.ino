@@ -35,11 +35,6 @@ bool decreaseButton = false;
 bool modeButton = false;
 bool detectingPeak = false;
 
-int resolutionmax = 4096;                                 // Resolucao de 12 bits (mudamos aqui quandi trocamos o dac para 12 bits)
-int triangularSignalResolution = resolutionmax * 3 / 3.3; // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
-int stepForAmpChanges = resolutionmax * 0.05 / 3.3;       // Calcula o valor em bits para usar como passos de acrescimento e decrescimo na amplitude pelos botoes
-int minVoltageValue = resolutionmax + 0.15 / 3.3;         // Valor minimo permitido na amplitude da tensao
-int numberOfStepsOnTriangSignal = triangularSignalResolution;
 int delayUs = 20;                                         // Delay em microssegundos entre as amostras
 int numReadings = 10;                                     // Numero de leituras para calcular a media
 int frequency = 10;                                       // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
@@ -56,8 +51,14 @@ const float referenceVoltage = 3.3;              // Tensao de referencia (volts)
 unsigned long cycleStartTime = 0;                // Armazena o tempo de inicio do ciclo
 unsigned long cycleEndTime = 0;                  // Armazena o tempo de fim do ciclo
 
-float amp_step = referenceVoltage / resolutionmax;                            // Dado necessario para o calculo da mostra da amplitude
-float amp = amp_step * triangularSignalResolution;                            // Calcula a amplitude
+float resolutionmax = 4096;                                                    // Resolucao de 12 bits (mudamos aqui quandi trocamos o dac para 12 bits)
+float triangularSignalResolution = resolutionmax * 3 / 3.3;                    // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nivel de amplitude
+float stepForAmpChanges = resolutionmax * 0.05 / 3.3;                          // Calcula o valor em bits para usar como passos de acrescimento e decrescimo na amplitude pelos botoes
+float maxVoltageValue = resolutionmax * 3 / 3.3;                               // Valor maximo permitido na amplitude da tensao
+float minVoltageValue = resolutionmax * 0.15 / 3.3;                            // Valor minimo permitido na amplitude da tensao
+float numberOfStepsOnTriangSignal = triangularSignalResolution;
+float amp_step = referenceVoltage / resolutionmax;                             // Dado necessario para o calculo da mostra da amplitude
+float amp = amp_step * triangularSignalResolution;                             // Calcula a amplitude
 double waiting_time = 1000000 / (frequency * numberOfStepsOnTriangSignal * 2); // Calcula o periodo esperado dado a frequencia escolhida em microsegundos
 
 std::vector<unsigned int> peaks_place;           // Vetor para armazenar o valor de pzt respectivos para os picos
@@ -104,8 +105,8 @@ void IRAM_ATTR handleIncreasePin() {
         case AMPLITUDE:
           triangularSignalResolution += stepForAmpChanges; // Salto de aprox 50mV
 
-          if (triangularSignalResolution > resolutionmax) {
-            triangularSignalResolution = resolutionmax;
+          if (triangularSignalResolution > maxVoltageValue) {
+            triangularSignalResolution = maxVoltageValue;
           }
 
           amp = amp_step * triangularSignalResolution;
@@ -159,7 +160,7 @@ void IRAM_ATTR handleDecreasePin() {
         case AMPLITUDE:
           triangularSignalResolution -= stepForAmpChanges; // Salto de aprox 50mV
 
-          if (triangularSignalResolution < minVoltageValue) { // Limite  minimo de amplitude de 150mV
+          if (triangularSignalResolution < minVoltageValue) { // Limite minimo de amplitude de 150mV
             triangularSignalResolution = minVoltageValue;
           }
 
@@ -234,7 +235,6 @@ void IRAM_ATTR handleModeSwitchPin() {
 
 // Função para configurar o valor do DAC
 void setDACValue(uint16_t value) {
-  display.ssd1306_command(SSD1306_DISPLAYOFF); // Desliga temporariamente o display
   delay(1); // Pequeno delay para evitar conflitos
 
   Wire.beginTransmission(MCP4725_ADDR);
@@ -244,7 +244,6 @@ void setDACValue(uint16_t value) {
   Wire.endTransmission();
 
   delay(1);
-  display.ssd1306_command(SSD1306_DISPLAYON); // Religa o display
 }
 
 //--------------------------------------------------------------------------------------------
