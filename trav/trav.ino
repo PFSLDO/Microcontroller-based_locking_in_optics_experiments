@@ -35,7 +35,7 @@ bool decreaseButton = false;
 bool modeButton = false;
 bool detectingPeak = false;
 
-int delayUs = 20;                                         // Delay em microssegundos entre as amostras
+int delayBetweenReadings = 20;                           // Delay em microssegundos entre as amostras
 int numReadings = 10;                                     // Numero de leituras para calcular a media
 int frequency = 10;                                       // Inicializa a frequencia do sinal em 10Hz, armazena a frequencia
 int step = 1;                                             // Passo para a rapidez do travamento
@@ -235,15 +235,11 @@ void IRAM_ATTR handleModeSwitchPin() {
 
 // Função para configurar o valor do DAC
 void setDACValue(uint16_t value) {
-  delay(1); // Pequeno delay para evitar conflitos
-
   Wire.beginTransmission(MCP4725_ADDR);
   Wire.write(0x40);  // Comando de escrita rápida
   Wire.write(value >> 4); // A operacao desloca os bits 4 posicoes para a direita, descartando os 4 bits menos significativos
   Wire.write((value & 0x0F) << 4); // Envia os 4 bits menos significativos do valor de 12 bits
   Wire.endTransmission();
-
-  delay(1);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -479,7 +475,7 @@ void loop() {
     long adcSum = 0;
     for (int i = 0; i < numReadings; i++) {
       adcSum += adc1_get_raw(adcChannel);
-      delayMicroseconds(delayUs);  // Pequeno delay entre leituras para evitar bug de leituras muito rapidas
+      delayMicroseconds(delayBetweenReadings);  // Pequeno delay entre leituras para evitar bug de leituras muito rapidas
     }
 
     int averageAdcValue = adcSum / numReadings;
