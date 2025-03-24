@@ -234,18 +234,23 @@ void IRAM_ATTR handleModeSwitchPin() {
 
 // Função para configurar o valor do DAC
 void setDACValue(uint16_t value) {
+  display.ssd1306_command(SSD1306_DISPLAYOFF); // Desliga temporariamente o display
+  delay(1); // Pequeno delay para evitar conflitos
+
   Wire.beginTransmission(MCP4725_ADDR);
   Wire.write(0x40);  // Comando de escrita rápida
   Wire.write(value >> 4); // A operacao desloca os bits 4 posicoes para a direita, descartando os 4 bits menos significativos
   Wire.write((value & 0x0F) << 4); // Envia os 4 bits menos significativos do valor de 12 bits
   Wire.endTransmission();
+
+  delay(1);
+  display.ssd1306_command(SSD1306_DISPLAYON); // Religa o display
 }
 
 //--------------------------------------------------------------------------------------------
 
 void setup() {
   Serial.begin(115200);
-
   Wire.begin();
 
   // configura o display oled
@@ -268,15 +273,9 @@ void setup() {
   display.write(62);
   display.display();
 
-  // Configura o DAC
-  //dac_output_enable(dacChannel);
-
   // Configura o ADC
   adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuacao
-
-  // Inicializa o valor do DAC
-  //dac_output_voltage(dacChannel, 0);
   setDACValue(0);
 
   // Configura os botoes com interrupcoes
@@ -294,6 +293,8 @@ void setup() {
 
 void loop() {
   if (currentSystemMode == SWEEP) {
+    bool updateDisplay = false;
+
     cycleStartTime = micros(); //Atualiza o valor de inicio da proxima iteracao
     value += direction;
 
@@ -323,10 +324,6 @@ void loop() {
       detectingPeak = false;
     }
 
-    //Atualizacoes do display apos interrupcoes
-    //Wire.begin();
-    //display.begin(OLED_ADDR);
-
     if (increaseButton == true) {
       increaseButton = false;
       
@@ -347,7 +344,7 @@ void loop() {
         break;
       }
 
-      display.display();
+      updateDisplay = true;
     }
     
     if (decreaseButton == true) {
@@ -370,7 +367,7 @@ void loop() {
         break;
       }
       
-      display.display();
+      updateDisplay = true;
     }
 
     if (optionButton == true) {
@@ -381,7 +378,6 @@ void loop() {
           display.setCursor(0,30);
           display.write(62);
           display.fillRect(0, 50, 6, 8, BLACK);
-          display.display();
         break;
         case FREQUENCY:
           display.setCursor(0,50);
@@ -390,7 +386,7 @@ void loop() {
         break;
       }
       
-      display.display();
+      updateDisplay = true;
     }
     
     if (modeButton == true) {
@@ -422,7 +418,7 @@ void loop() {
             display.write(62);
           }
         
-          display.display();
+          updateDisplay = true;
         break;
         case LOCK:
           display.setTextSize(1);
@@ -456,12 +452,10 @@ void loop() {
           break;
         }
 
-        display.display();
+        updateDisplay = true;
         break;
       }
     }
-
-    //display.endTransmission();
 
     cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteracao
     
@@ -470,8 +464,14 @@ void loop() {
     }
 
     setDACValue(value);
+
+    if (updateDisplay) {
+      display.display();
+    }
   }
   else if (currentSystemMode == LOCK) {
+    bool updateDisplay = false;
+
     //Calcula o novo valor a ser passado para o PZT
     value += direction * step;
     setDACValue(value);
@@ -494,10 +494,6 @@ void loop() {
     }
 
     lastAdcValue = averageAdcValue; // Atualiza a variavel de ultima leitura do ADC 
-
-    //Atualizacoes do display apos interrupcoes
-    //Wire.begin();
-    //display.begin(OLED_ADDR);
 
     if (increaseButton == true) {
       increaseButton = false;
@@ -523,7 +519,7 @@ void loop() {
         break;
       }
 
-      display.display();
+      updateDisplay = true;
     }
 
     if (decreaseButton == true) {
@@ -550,7 +546,7 @@ void loop() {
         break;
       }
 
-      display.display();
+      updateDisplay = true;
     }
 
     if (optionButton == true) {
@@ -563,7 +559,6 @@ void loop() {
           display.fillRect(0, 32, 6, 8, BLACK);
           display.fillRect(0, 44, 6, 8, BLACK);
           display.fillRect(0, 56, 6, 8, BLACK);
-          display.display();
         break;
         case PEAK:
           display.setCursor(0,32);
@@ -581,7 +576,7 @@ void loop() {
         break;
       }
 
-      display.display();
+      updateDisplay = true;
     }
 
     if (modeButton == true) {
@@ -613,7 +608,7 @@ void loop() {
             display.write(62);
           }
         
-          display.display();
+          updateDisplay = true;
         break;
         case LOCK:
           display.setTextSize(1);
@@ -647,11 +642,13 @@ void loop() {
             break;
           }
         
-          display.display();
+          updateDisplay = true;
         break;
       }
     }
 
-    //display.endTransmission();
+    if (updateDisplay) {
+      display.display();
+    }
   }
 }
