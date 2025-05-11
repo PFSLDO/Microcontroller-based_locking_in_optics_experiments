@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;blinky/Core/Src/platform_stm32f4.c&apos; to &apos;platform_stm32l4.c&apos;" description="Rename resource &apos;platform_stm32f4.c&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="Core/Src/platform_stm32f4.c" name="platform_stm32l4.c" stamp="1746932456992" updateReferences="true"/>
+</session>
