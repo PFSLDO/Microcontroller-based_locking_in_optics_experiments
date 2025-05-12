@@ -1,5 +1,0 @@
-../Core/Src/platform_stm32l4.c:16:6:_platform_gpio_write	1
-../Core/Src/platform_stm32l4.c:23:9:_platform_gpio_read	1
-../Core/Src/platform_stm32l4.c:30:6:_platform_pwm_control	9
-../Core/Src/platform_stm32l4.c:49:6:_platform_delay_ms	1
-../Core/Src/platform_stm32l4.c:53:6:_platform_delay_us	2

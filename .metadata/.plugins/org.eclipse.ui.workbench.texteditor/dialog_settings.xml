@@ -3,6 +3,10 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="false"/>
 	<list key="searchhistory">
+		<item value="MX_GPIO_Init"/>
+		<item value="LCD_WriteMessage"/>
+		<item value="LCD_Send"/>
+		<item value="LED_TOGGLE_DELAY"/>
 		<item value="enum"/>
 		<item value="HAL_WWDG_MODULE_ENABLED"/>
 	</list>
