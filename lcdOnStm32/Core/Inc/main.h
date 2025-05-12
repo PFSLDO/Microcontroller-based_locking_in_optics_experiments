@@ -59,9 +59,26 @@ void lcd_send_command(uint8_t cmd);
 void lcd_send_data(uint8_t data);
 void lcd_set_cursor(uint8_t row, uint8_t col);
 void lcd_print(char *str);
+
+void handleSelectButton();
+void handleModeButton();
+void handleIncreaseButton();
+void handleDecreaseButton();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define Decrease_BTN_Pin GPIO_PIN_0
+#define Decrease_BTN_GPIO_Port GPIOA
+#define Decrease_BTN_EXTI_IRQn EXTI0_IRQn
+#define Increase_BTN_Pin GPIO_PIN_1
+#define Increase_BTN_GPIO_Port GPIOA
+#define Increase_BTN_EXTI_IRQn EXTI1_IRQn
+#define Mode_BTN_Pin GPIO_PIN_4
+#define Mode_BTN_GPIO_Port GPIOB
+#define Mode_BTN_EXTI_IRQn EXTI4_IRQn
+#define Select_BTN_Pin GPIO_PIN_5
+#define Select_BTN_GPIO_Port GPIOB
+#define Select_BTN_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
 #define LCD_E_PORT       GPIOA
@@ -99,21 +116,11 @@ void lcd_print(char *str);
 #define LCD_BLINK_ON            0x01
 #define LCD_BLINK_OFF           0x00
 
-// Definição dos limites dos botões (ajuste conforme necessário)
-#define RIGHT_THRESHOLD    50
-#define UP_THRESHOLD       1150
-#define DOWN_THRESHOLD     1900
-#define LEFT_THRESHOLD     2650
-#define SELECT_THRESHOLD   3750
+//Enums
+enum SweepMode { AMPLITUDE, FREQUENCY };
+enum LockMode { STEP, PEAK, AMOSTRAS };
+enum SystemMode { SWEEP, LOCK };
 
-typedef enum {
-    BUTTON_NONE = 0,
-    BUTTON_RIGHT,
-    BUTTON_UP,
-    BUTTON_DOWN,
-    BUTTON_LEFT,
-    BUTTON_SELECT
-} ButtonState;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -50,11 +50,7 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-volatile uint8_t buttonPressed = 0;
 
-void SystemClock_Config();
-
-ButtonState readButton();
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,6 +67,7 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 /* USER CODE END 0 */
 
 /**
@@ -108,15 +105,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  lcd_init();
-  lcd_clear();
-  lcd_set_cursor(0, 3);
-  lcd_print("Travamento");
-  lcd_set_cursor(1, 0);
-  lcd_print("Cavidade Triang");
-  HAL_Delay(2000);
-  lcd_clear();
-  lcd_set_cursor(0, 0);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -225,7 +214,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_6;
+  sConfig.Channel = ADC_CHANNEL_15;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
@@ -442,10 +431,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5
                           |GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : Decrease_BTN_Pin Increase_BTN_Pin */
+  GPIO_InitStruct.Pin = Decrease_BTN_Pin|Increase_BTN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PA2 PA3 PA4 PA5
@@ -457,9 +446,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : Mode_BTN_Pin Select_BTN_Pin */
+  GPIO_InitStruct.Pin = Mode_BTN_Pin|Select_BTN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -467,154 +471,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// Função para gerar o pulso de habilitação
-void lcd_enable() {
-    HAL_GPIO_WritePin(GPIOA, LCD_E_PIN, GPIO_PIN_SET);
-    HAL_Delay(2);  // Delay ajustado
-    HAL_GPIO_WritePin(GPIOA, LCD_E_PIN, GPIO_PIN_RESET);
-    HAL_Delay(2);  // Delay ajustado
-}
 
-// Função interna para enviar um byte (comando ou dado)
-void lcd_send(uint8_t data) {
-    // Enviar nibble alto
-    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (data >> 4) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (data >> 5) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (data >> 6) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (data >> 7) & 0x01);
-    lcd_enable();
-
-    // Enviar nibble baixo
-    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (data >> 0) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (data >> 1) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (data >> 2) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (data >> 3) & 0x01);
-    lcd_enable();
-}
-
-void lcd_send_command(uint8_t cmd) {
-    HAL_GPIO_WritePin(GPIOA, LCD_RS_PIN, GPIO_PIN_RESET);
-    lcd_send(cmd);
-    HAL_Delay(2);  // Delay adicional
-}
-
-void lcd_send_data(uint8_t data) {
-    HAL_GPIO_WritePin(GPIOA, LCD_RS_PIN, GPIO_PIN_SET);
-    lcd_send(data);
-    HAL_Delay(2);  // Delay adicional
-}
-
-// Inicialização do LCD
-void lcd_init() {
-    HAL_Delay(50);  // Esperar mais tempo após o boot
-
-    lcd_send_command(0x03);
-    HAL_Delay(5);
-    lcd_send_command(0x03);
-    HAL_Delay(5);
-    lcd_send_command(0x03);
-    HAL_Delay(5);
-    lcd_send_command(0x02);  // Modo 4 bits
-    HAL_Delay(5);
-
-    lcd_send_command(LCD_FUNCTION_SET | 0x08);
-    lcd_send_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON | LCD_CURSOR_OFF | LCD_BLINK_OFF);
-    lcd_send_command(LCD_CLEAR_DISPLAY);
-    HAL_Delay(2);
-    lcd_send_command(LCD_ENTRY_MODE_SET | LCD_ENTRY_LEFT);
-}
-
-// Limpa o display
-void lcd_clear(void) {
-    lcd_send_command(LCD_CLEAR_DISPLAY);
-    HAL_Delay(2);
-}
-
-// Define a posição do cursor
-void lcd_set_cursor(uint8_t row, uint8_t col) {
-    uint8_t address = (row == 0) ? 0x00 : 0x40;
-    address += col;
-    lcd_send_command(LCD_SET_DDRAM_ADDR | address);
-}
-
-// Escreve uma string no LCD
-void lcd_print(char *str) {
-    while (*str) {
-        lcd_send_data(*str++);
-    }
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-    if (GPIO_Pin == GPIO_PIN_0) {  // Interrupção no PA0 (botão pressionado)
-        buttonPressed = 1;          // Sinaliza que um botão foi pressionado
-
-        // Chama a função para interpretar a entrada do ADC (PA1)
-        ButtonState button = readButton();
-
-        // Faça o que precisar com o botão detectado
-        switch (button) {
-            case BUTTON_RIGHT:
-            	  lcd_set_cursor(0, 0);
-            	  lcd_print("dir");
-            	  HAL_Delay(2000);
-            	  lcd_clear();
-            	break;
-            case BUTTON_UP:
-          	  lcd_set_cursor(0, 0);
-          	  lcd_print("up");
-          	  HAL_Delay(2000);
-          	  lcd_clear();
-          	break;
-            case BUTTON_DOWN:
-          	  lcd_set_cursor(0, 0);
-          	  lcd_print("down");
-          	  HAL_Delay(2000);
-          	  lcd_clear();
-          	break;
-            case BUTTON_LEFT:
-          	  lcd_set_cursor(0, 0);
-          	  lcd_print("esq");
-          	  HAL_Delay(2000);
-          	  lcd_clear();
-          	break;
-            case BUTTON_SELECT:
-          	  lcd_set_cursor(0, 0);
-          	  lcd_print("sel");
-          	  HAL_Delay(2000);
-          	  lcd_clear();
-          	break;
-            default:
-            	lcd_set_cursor(0, 0);
-            	          	  lcd_print("bah nao deu");
-            	          	  HAL_Delay(2000);
-            	          	  lcd_clear();
-            	          	break;
-        }
-    }
-}
-
-ButtonState readButton(void) {
-    uint32_t adcValue = 0;
-    HAL_ADC_Start(&hadc1);
-    if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
-        adcValue = HAL_ADC_GetValue(&hadc1);
-    }
-    HAL_ADC_Stop(&hadc1);
-
-    if (adcValue < RIGHT_THRESHOLD) {
-        return BUTTON_RIGHT;
-    } else if (adcValue < UP_THRESHOLD) {
-        return BUTTON_UP;
-    } else if (adcValue < DOWN_THRESHOLD) {
-        return BUTTON_DOWN;
-    } else if (adcValue < LEFT_THRESHOLD) {
-        return BUTTON_LEFT;
-    } else if (adcValue < SELECT_THRESHOLD) {
-        return BUTTON_SELECT;
-    } else {
-        return BUTTON_NONE;
-    }
-}
 /* USER CODE END 4 */
 
 /**
