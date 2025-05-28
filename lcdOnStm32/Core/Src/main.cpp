@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stdio.h"
 #include "vector"
 
 /* Private includes ----------------------------------------------------------*/
@@ -59,8 +60,8 @@ volatile uint8_t selectButton = 0;
 volatile uint8_t modeButton = 0;
 
 //DAC information
-const unsigned int dacResolution = 12;
-const unsigned int maxDacResolution = 4095;
+uint8_t I2C_ADDRESS = 0x60;
+const unsigned int dacResolution = 4095;
 double dacValue = 0.0;
 double targetDacValue = 0.0;
 
@@ -68,20 +69,20 @@ double targetDacValue = 0.0;
 const unsigned int maxAdcResolution = 4095;
 
 //Sweep mode - Triangular signal
-const unsigned int maxVoltageReference = 3.3;
-int triangularAmp = (3 * maxDacResolution)/referenceMaxVoltage; //start the triangular signal with 3V
+const double maxVoltageReference = 3.3;
+unsigned int triangularAmp = (3.0 * dacResolution)/maxVoltageReference; //start the triangular signal with 3V
 int frequency = 10;
-double ampStepSweep = maxVoltageReference/maxResolution;
-volatile double ampSweep = ampStepWeep * triangularAmp;
-int sensorReading = 0;
-int lastSensorReading = 0;
+double ampStepSweep = maxVoltageReference/maxAdcResolution;
+volatile double ampSweep = ampStepSweep * triangularAmp;
+int adcValue = 0;
+int lastAdcValue = 0;
 const int maxThreshold = (0.04 * maxAdcResolution)/maxVoltageReference; //limits the detection to 40mV
 const int minThreshold = (0.02 * maxAdcResolution)/maxVoltageReference; //limits to reset detection to 20mV
-bool detectingPeak = false;
+volatile uint8_t detectingPeak = 0;
 std::vector<unsigned int> peaksPositions;
 int currentPeakIndex = 0;
 int stepForAmplitude = (0.05 * dacResolution)/maxVoltageReference; // 50mV
-int maxAmplitude = (0.150 * dacResolution)/maxVoltageReference; //150mV
+unsigned int minAmplitude = (0.150 * dacResolution)/maxVoltageReference; //150mV
 
 //Locking mode
 int numReadings = 10; //number of readings to calculate the next step
@@ -89,16 +90,18 @@ int stepsLocking = 1;
 int stepDirection = 1;
 
 //Time variables
-unsigned long cycleStartTime = 0;
-unsigned long cycleEndTime = 0;
-int delayInterrupt = 250;
+uint32_t delayInterrupt = 250;
 double waitingTime = 1000000/(frequency * triangularAmp * 2);
+volatile uint32_t millis_counter = 0;
 
 SweepMode currentSweepMode = AMPLITUDE;
 LockMode currentLockMode = STEP;
 SystemMode currentSystemMode = SWEEP;
 
 void SystemClock_Config();
+void updateSweepDisplay();
+void updateLockDisplay();
+uint32_t micros();
 
 /* USER CODE END PV */
 
@@ -132,7 +135,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -149,10 +152,15 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_TIM1_Init();
-  MX_TIM2_Init();
+  HAL_TIM_Base_Start(&htim2);
   MX_USART1_UART_Init();
   MX_ADC1_Init();
+  HAL_ADC_Start(&hadc1);
   /* USER CODE BEGIN 2 */
+  __HAL_RCC_TIM2_CLK_ENABLE();
+  MX_TIM2_Init();
+  HAL_TIM_Base_Start(&htim2);
+
   lcd_init();
   lcd_clear();
   lcd_set_cursor(0, 3);
@@ -162,6 +170,17 @@ int main(void)
   HAL_Delay(2000);
   lcd_clear();
   lcd_set_cursor(0, 0);
+  lcd_print("Sweep");
+  lcd_set_cursor(0, 6);
+  lcd_print("Amp:");
+  lcd_print_double(ampSweep);
+  lcd_print("V");
+  lcd_set_cursor(1, 6);
+  lcd_print("Freq:");
+  lcd_print_double(frequency);
+  lcd_print("Hz");
+  lcd_set_cursor(0,5);
+  lcd_print(">");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -169,7 +188,253 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	  if (currentSystemMode == SWEEP) {
+		  //uint32_t cycleStartTime = micros();
 
+	      dacValue += stepDirection;
+
+	      if (dacValue >= dacResolution) {
+	        dacValue = dacResolution;
+	        stepDirection = -1;
+	      } else if (dacValue <= 0) {
+	        dacValue = 0;
+	        stepDirection = 1;
+	      }
+
+	      //int averageAdcValue = adc1_get_raw(adcChannel); //talvez bugue porque antes estava iniciando uma nova variavel
+	      if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
+	          adcValue = HAL_ADC_GetValue(&hadc1);
+	      }
+
+	      // Detecção de picos (apenas quando a varredura está em direção positiva)
+	      if (stepDirection == 1) {
+	        if (adcValue > maxThreshold) {
+	          if(detectingPeak){
+	        	peaksPositions.pop_back();
+	          }
+
+	          peaksPositions.push_back(dacValue);
+	          detectingPeak = 1;
+	        }
+	      }
+	      if (detectingPeak && adcValue < minThreshold) {
+	        detectingPeak = 0;
+	      }
+
+	      if(increaseButton == 1) {
+	        increaseButton = 0;
+
+	        switch (currentSweepMode) {
+	              case AMPLITUDE:
+	                triangularAmp += stepForAmplitude;
+
+	                if (triangularAmp > dacResolution) {
+	                	triangularAmp = dacResolution;
+	                }
+
+	                ampSweep = ampStepSweep * triangularAmp;
+	                break;
+	              case FREQUENCY:
+	                frequency += 5;
+
+	                if (frequency > 50) {
+	                	frequency = 50;
+	                }
+	                break;
+	              }
+
+	        if (triangularAmp > 0) {
+	            waitingTime = 1000000 / (frequency * triangularAmp * 2);
+	        } else {
+	            waitingTime = 1000000; // Ou algum valor padrão seguro
+	        }
+
+	        updateSweepDisplay();
+	      }
+	      if (decreaseButton == 1) {
+	        decreaseButton = 0;
+
+	        switch (currentSweepMode) {
+	              case AMPLITUDE:
+	            	  if (triangularAmp > minAmplitude + stepForAmplitude) {
+	            	      triangularAmp -= stepForAmplitude;
+	            	  } else {
+	            	      triangularAmp = minAmplitude;
+	            	  }
+
+	                ampSweep = ampStepSweep * triangularAmp;
+	                break;
+	              case FREQUENCY:
+	                frequency -= 5;
+
+	                if (frequency < 5) {
+	                	frequency = 5;
+	                }
+	                break;
+	              }
+
+	        if (triangularAmp > 0) {
+	            waitingTime = 1000000 / (frequency * triangularAmp * 2);
+	        } else {
+	            waitingTime = 1000000; // Ou algum valor padrão seguro
+	        }
+
+	        updateSweepDisplay();
+	      }
+
+	      if (selectButton == 1) {
+	          selectButton = 0;
+
+	          currentSweepMode = static_cast<SweepMode>((currentSweepMode + 1) % 2);
+	          updateSweepDisplay();
+	      }
+
+	      if (modeButton == 1) {
+	    	modeButton = 0;
+
+	        currentSystemMode = static_cast<SystemMode>((currentSystemMode + 1) % 2);
+
+	        switch (currentSystemMode) {
+	          case SWEEP:
+	            dacValue = 0;
+	            stepDirection = 1;
+	            break;
+	          case LOCK:
+	        	dacValue = targetDacValue;
+	            lastAdcValue = adcValue - 1;
+	            stepDirection = 1;
+	            break;
+	        }
+
+	        switch (currentSystemMode) {
+	        case SWEEP:
+	        	  updateSweepDisplay();
+	        break;
+	        case LOCK:
+	        	  updateLockDisplay();
+	        break;
+	        }
+	      }
+
+	      //uint32_t cycleEndTime = micros();
+
+	      //while ((cycleEndTime - cycleStartTime) < waitingTime) {
+	      //    cycleEndTime = micros();
+	      //}
+
+	      //static uint16_t lastSentDac = 0xFFFF;
+	      //if (dacValue != lastSentDac) {
+	      //    sendI2CData(I2C_ADDRESS, dacValue);
+	      //    lastSentDac = dacValue;
+	      //}
+	    }
+	  else if (currentSystemMode == LOCK) {
+	      dacValue += stepDirection * stepsLocking;
+	      sendI2CData(I2C_ADDRESS, dacValue);
+
+	      //Verifica a resposta do sistema, fazendo uma média na leitura para filtrar o ruído
+	      long adcSum = 0;
+
+	      for (int i = 0; i < numReadings; i++) {
+	        adcSum += HAL_ADC_GetValue(&hadc1);
+	        HAL_Delay(5);  // Pequeno delay entre leituras para evitar leituras muito rápidas
+	      }
+
+	      adcValue = adcSum / numReadings; //ficou diferente
+
+	      // Executa a comparação e ajuste de direção caso necessário
+	      if (adcValue > lastAdcValue) {
+	    	stepDirection = stepDirection;
+	      } else if (adcValue < lastAdcValue) {
+	    	stepDirection = -stepDirection;
+	      }
+
+	      lastAdcValue = adcValue; // Atualiza a variável de última leitura do ADC
+
+	      if (increaseButton == 1) {
+	        increaseButton = 0;
+
+	        switch (currentLockMode) {
+	                case PEAK:
+	                  if (!peaksPositions.empty()) {
+	                    currentPeakIndex = (currentPeakIndex + 1) % peaksPositions.size();
+	                    targetDacValue = peaksPositions[currentPeakIndex];
+	                    dacValue = targetDacValue;
+	                  }
+	                  break;
+	                case STEP:
+	                	stepsLocking++;
+	                  break;
+	                case AMOSTRAS:
+	                	numReadings++;
+	                	break;
+	              }
+
+	        updateLockDisplay();
+	      }
+
+	      if(decreaseButton == 1) {
+	        decreaseButton = 0;
+
+	        switch (currentLockMode) {
+	        case PEAK:
+	          if (!peaksPositions.empty()) {
+	            currentPeakIndex = (currentPeakIndex - 1 + peaksPositions.size()) % peaksPositions.size();
+	            targetDacValue = peaksPositions[currentPeakIndex];
+	            dacValue = targetDacValue;
+	          }
+	          break;
+	        case STEP:
+	      	  stepsLocking--;
+	          if (stepsLocking < 1) {
+	          	stepsLocking = 1;
+	          }
+	          break;
+	        case AMOSTRAS:
+	          numReadings--;
+	          if (numReadings < 1) {
+	          	numReadings = 1;
+	          }
+	          break;
+	        }
+
+	        updateLockDisplay();
+	      }
+
+	      if(selectButton == 1) {
+	    	selectButton = 0;
+
+	    	currentLockMode = static_cast<LockMode>((currentLockMode + 1) % 3);
+	    	updateLockDisplay();
+	      }
+
+	      if(modeButton == 1) {
+	        modeButton = 0;
+
+	        currentSystemMode = static_cast<SystemMode>((currentSystemMode + 1) % 2);  //alternates between SWEEP e LOCK
+
+	        switch (currentSystemMode) {
+	          case SWEEP:
+	            dacValue = 0;
+	            stepDirection = 1;
+	            break;
+	          case LOCK:
+	        	dacValue = targetDacValue;
+	            lastAdcValue = adcValue - 1;
+	            stepDirection = 1;
+	            break;
+	        }
+
+	        switch (currentSystemMode) {
+	        case SWEEP:
+	        	updateSweepDisplay();
+	        break;
+	        case LOCK:
+	        	updateLockDisplay();
+	          break;
+	        }
+	      }
+	    }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -247,7 +512,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -403,15 +668,17 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 3;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4294967295;
+  htim2.Init.Period = 0xFFFFFFFF;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
   }
+
+  HAL_TIM_Base_Start(&htim2);
   sSlaveConfig.SlaveMode = TIM_SLAVEMODE_EXTERNAL1;
   sSlaveConfig.InputTrigger = TIM_TS_TI1FP1;
   sSlaveConfig.TriggerPolarity = TIM_TRIGGERPOLARITY_RISING;
@@ -489,7 +756,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : Decrease_BTN_Pin Increase_BTN_Pin */
   GPIO_InitStruct.Pin = Decrease_BTN_Pin|Increase_BTN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
@@ -504,7 +771,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : Mode_BTN_Pin Select_BTN_Pin */
   GPIO_InitStruct.Pin = Mode_BTN_Pin|Select_BTN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -527,6 +794,19 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void SysTick_Handler(void) {
+    HAL_IncTick();  // Mantém a função HAL atualizada
+    millis_counter++;
+}
+
+uint32_t millis() {
+    return millis_counter;
+}
+
+uint32_t micros() {
+    return __HAL_TIM_GET_COUNTER(&htim2);
+}
+
 // Função para gerar o pulso de habilitação
 void lcd_enable() {
     HAL_GPIO_WritePin(GPIOA, LCD_E_PIN, GPIO_PIN_SET);
@@ -538,17 +818,17 @@ void lcd_enable() {
 // Função interna para enviar um byte (comando ou dado)
 void lcd_send(uint8_t data) {
     // Enviar nibble alto
-    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (data >> 4) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (data >> 5) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (data >> 6) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (data >> 7) & 0x01);
+    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (GPIO_PinState)((data >> 4) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (GPIO_PinState)((data >> 5) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (GPIO_PinState)((data >> 6) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (GPIO_PinState)((data >> 7) & 0x01));
     lcd_enable();
 
     // Enviar nibble baixo
-    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (data >> 0) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (data >> 1) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (data >> 2) & 0x01);
-    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (data >> 3) & 0x01);
+    HAL_GPIO_WritePin(GPIOA, LCD_D7_PIN, (GPIO_PinState)((data >> 0) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D6_PIN, (GPIO_PinState)((data >> 1) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D5_PIN, (GPIO_PinState)((data >> 2) & 0x01));
+    HAL_GPIO_WritePin(GPIOA, LCD_D4_PIN, (GPIO_PinState)((data >> 3) & 0x01));
     lcd_enable();
 }
 
@@ -598,7 +878,7 @@ void lcd_set_cursor(uint8_t row, uint8_t col) {
 }
 
 // Escreve uma string no LCD
-void lcd_print(char *str) {
+void lcd_print(const char *str) {
     while (*str) {
         lcd_send_data(*str++);
     }
@@ -607,19 +887,15 @@ void lcd_print(char *str) {
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {
 	case Decrease_BTN_Pin:
-		decreaseButton = 1;
 		handleDecreaseButton();
 		break;
 	case Increase_BTN_Pin:
-		increaseButton = 1;
 		handleIncreaseButton();
 		break;
 	case Select_BTN_Pin:
-		selectButton = 1;
 		handleSelectButton();
 		break;
 	case Mode_BTN_Pin:
-		modeButton = 1;
 		handleModeButton();
 		break;
 	default:
@@ -629,141 +905,121 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 void handleSelectButton() {
   static unsigned long lastInterruptTime = 0;
-  unsigned long interruptTime = millis();
 
-  if (interruptTime - lastInterruptTime > delayInterrupt) {
-    optionButton = true;
-
-    if (currentSystemMode == SWEEP) {
-      currentSweepMode = static_cast<ModeSweep>((currentSweepMode + 1) % 2);  //alternates between AMPLITUDE, FREQUENCY
-    }
-    else if (currentSystemMode == LOCK) {
-      currentLockMode = static_cast<ModeLock>((currentLockMode + 1) % 3);  //alternates between PEAK, STEP, AMOSTRAS
-    }
+  if (HAL_GetTick() - lastInterruptTime > delayInterrupt) {
+	selectButton = 1;
+	lastInterruptTime = HAL_GetTick();
   }
-
-  lastInterruptTime = interruptTime;
 }
 
 void handleIncreaseButton() {
   static unsigned long lastInterruptTime = 0;
-  unsigned long interruptTime = millis();
 
-  if (interruptTime - lastInterruptTime > delayInterrupt) {
-    increaseButton = true;
-    if (currentSystemMode == SWEEP) {
-      switch (currentSweepMode) {
-      case AMPLITUDE:
-        triangularAmp += stepForAmplitude;
-
-        if (triangularAmp > dacResolution) {
-        	triangularAmp = dacResolution;
-        }
-        break;
-      case FREQUENCY:
-        frequency += 5;
-
-        if (frequency > 50) {
-        	frequency = 50;
-        }
-        break;
-      }
+  if (HAL_GetTick() - lastInterruptTime > delayInterrupt) {
+	  increaseButton = 1;
+	  lastInterruptTime = HAL_GetTick();
     }
-    else if (currentSystemMode == LOCK) {
-      switch (currentLockMode) {
-        case PEAK:
-          if (!peaks_place.empty()) {
-            currentPeakIndex = (currentPeakIndex + 1) % peaks_place.size();
-            targetValue = peaks_place[currentPeakIndex];
-            value = targetValue;
-          }
-          break;
-        case STEP:
-          step++;
-          break;
-        case AMOSTRAS:
-          numReadings++;
-          break;
-      }
-    }
-  }
-
-  lastInterruptTime = interruptTime;
 }
 
 
 void handleDecreaseButton() {
   static unsigned long lastInterruptTime = 0;
-  unsigned long interruptTime = millis();
 
-  if (interruptTime - lastInterruptTime > delayInterrupt) {
-    decreaseButton = true;
-
-    if (currentSystemMode == SWEEP) {
-      switch (currentSweepMode) {
-      case AMPLITUDE:
-        triangularAmp -= stepForAmplitude;
-
-        if (triangularAmp < maxAmplitude) {
-        	triangularAmp = maxAmplitude;
-        }
-        break;
-      case FREQUENCY:
-        frequency -= 5;
-
-        if (frequency < 5) {
-        	frequency = 5;
-        }
-        break;
-      }
-    }
-    else if (currentSystemMode == LOCK) {
-      switch (currentLockMode) {
-      case PEAK:
-        if (!peaksPositions.empty()) {
-          currentPeakIndex = (currentPeakIndex - 1 + peaksPositions.size()) % peaksPositions.size();
-          targetValue = peaksPositions[currentPeakIndex];
-          value = targetValue;
-        }
-        break;
-      case STEP:
-        step--;
-        if (step < 1) step = 1;
-        break;
-      case AMOSTRAS:
-        numReadings--;
-        if (numReadings < 1) numReadings = 1;
-        break;
-      }
-    }
+  if (HAL_GetTick() - lastInterruptTime > delayInterrupt) {
+    decreaseButton = 1;
+    lastInterruptTime = HAL_GetTick();
   }
-
-  lastInterruptTime = interruptTime;
 }
 
 
 void handleModeButton() {
   static unsigned long lastInterruptTime = 0;
-  unsigned long interruptTime = millis();
 
-  if (interruptTime - lastInterruptTime > delayInterrupt) {
-    modeButton = true;
-    currentSystemMode = static_cast<SystemMode>((currentSystemMode + 1) % 2);  //alternates between SWEEP e LOCK
-
-    switch (currentSystemMode) {
-      case SWEEP:
-        value = 0;
-        direction = 1;
-        break;
-      case LOCK:
-        value = targetValue;
-        lastAdcValue = averageAdcValue - 1;
-        direction = 1;
-        break;
-    }
+  if (HAL_GetTick() - lastInterruptTime > delayInterrupt) {
+    modeButton = 1;
+    lastInterruptTime = HAL_GetTick();
   }
+}
 
-  lastInterruptTime = interruptTime;
+void lcd_print_double(double value) {
+    char buffer[16];
+
+    int intPart = (int)value;
+    int decimalPart = (int)((value - intPart) * 100);
+
+    if (decimalPart < 0) {
+    	decimalPart *= -1;
+    }
+
+    if (decimalPart == 0) {
+    	snprintf(buffer, sizeof(buffer), "%d", intPart);
+    }
+    else {
+    	snprintf(buffer, sizeof(buffer), "%d.%02d", intPart, decimalPart);
+    }
+
+    lcd_print(buffer);
+}
+
+HAL_StatusTypeDef sendI2CData(uint8_t address, uint16_t data) {
+    uint8_t i2cData[2];
+
+    // Formato esperado pelo MCP4725 (modo de escrita rápida)
+    i2cData[0] = (data >> 4) & 0xFF;           // Bits D11–D4
+    i2cData[1] = (data & 0x0F) << 4;           // Bits D3–D0 deslocados para MSB
+
+    return HAL_I2C_Master_Transmit(&hi2c1, address << 1, i2cData, 2, 10);
+}
+
+void updateSweepDisplay() {
+	lcd_clear();
+
+    lcd_set_cursor(0, 0);
+    lcd_print("Sweep");
+
+    lcd_set_cursor(0, 6);
+    lcd_print("Amp:");
+    lcd_print_double(ampSweep);
+    lcd_print("V");
+
+    lcd_set_cursor(1, 6);
+    lcd_print("Freq:");
+    lcd_print_double(frequency);
+    lcd_print("Hz");
+
+    // Atualiza seta
+    lcd_set_cursor(0, 5);
+    lcd_print(currentSweepMode == AMPLITUDE ? ">" : " ");
+    lcd_set_cursor(1, 5);
+    lcd_print(currentSweepMode == FREQUENCY ? ">" : " ");
+}
+
+void updateLockDisplay() {
+    lcd_clear();
+
+    lcd_set_cursor(0, 0);
+    lcd_print("Lock");
+
+    lcd_set_cursor(0, 8);
+    lcd_print("Steps:");
+    lcd_print_double(stepsLocking);
+
+    lcd_set_cursor(1, 1);
+    lcd_print("Peak:");
+    lcd_print_double(currentPeakIndex + 1);
+
+    lcd_set_cursor(1, 8);
+    lcd_print("NRead:");
+    lcd_print_double(numReadings);
+
+    lcd_set_cursor(0, 7);
+    lcd_print(currentLockMode == STEP ? ">" : " ");
+
+    lcd_set_cursor(1, 0);
+    lcd_print(currentLockMode == PEAK ? ">" : " ");
+
+    lcd_set_cursor(1, 7);
+    lcd_print(currentLockMode == AMOSTRAS ? ">" : " ");
 }
 
 /* USER CODE END 4 */

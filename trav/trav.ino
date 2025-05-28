@@ -278,7 +278,8 @@ void loop() {
         display.print("Hz");
         break;
       }
-      display.display();}
+      display.display();
+    }
     if(decreaseButton == true) {
       decreaseButton = false;
       switch (currentModeSweep) {

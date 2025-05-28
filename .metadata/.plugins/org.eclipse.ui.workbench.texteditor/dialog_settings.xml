@@ -1,13 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<item key="hasShownOverlayPopupBefore" value="true"/>
-	<item key="replaceBarOpen" value="false"/>
+	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
-		<item value="MX_GPIO_Init"/>
-		<item value="LCD_WriteMessage"/>
-		<item value="LCD_Send"/>
-		<item value="LED_TOGGLE_DELAY"/>
-		<item value="enum"/>
-		<item value="HAL_WWDG_MODULE_ENABLED"/>
+		<item value="peaksPositions"/>
+		<item value="peak"/>
+		<item value="peak:"/>
+		<item value="i2c"/>
+		<item value="HAL_MAX_DELAY"/>
+		<item value="sendi2"/>
+		<item value="pull"/>
+		<item value="MX_TIM2_Init"/>
+		<item value="sendI2CData"/>
+		<item value="selectButton"/>
+		<item value="waiting"/>
+		<item value="currentPeakIndex"/>
+		<item value="min"/>
+		<item value="waitingTime"/>
+		<item value="minAmplitude"/>
+	</list>
+	<list key="replacehistory">
+		<item value="currentLockMode"/>
+		<item value="currentSweepMode"/>
+		<item value="peaksPositions"/>
+		<item value="peaksPosition"/>
+		<item value="dacValue"/>
+		<item value="adcValue"/>
+		<item value="triangularAmp"/>
 	</list>
 </section>

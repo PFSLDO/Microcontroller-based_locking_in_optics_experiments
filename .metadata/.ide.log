@@ -1,15 +1,2 @@
-2025-05-12 13:12:32,450 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:14:38,978 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:17:35,858 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:17:37,894 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:17:39,910 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:22:14,514 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:46:46,038 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:46:48,059 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:46:50,062 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:47:03,713 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 13:49:04,246 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 14:51:05,463 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
-2025-05-12 14:51:07,801 [ERROR] AdobePublisher:162 - Exception while opening the connection: java.net.SocketTimeoutException: Connect timed out
-2025-05-12 14:51:09,804 [ERROR] AdobePublisher:162 - Exception while opening the connection: java.net.SocketTimeoutException: Connect timed out
-2025-05-12 16:10:12,309 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
+2025-05-27 16:55:01,039 [ERROR] ConfigurationRetriever:142 - IOException on connection: Connect timed out
+2025-05-27 22:29:10,621 [ERROR] LogOutputStream:75 - [STDERR_REDIRECT] 
