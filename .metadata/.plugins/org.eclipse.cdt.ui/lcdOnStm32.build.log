@@ -1,10 +1,10 @@
-21:51:52 **** Incremental Build of configuration Debug for project lcdOnStm32 ****
+20:10:46 **** Incremental Build of configuration Debug for project lcdOnStm32 ****
 make -j7 all 
 arm-none-eabi-size  lcdOnStm32.elf 
    text	   data	    bss	    dec	    hex	filename
-  33304	    140	   2464	  35908	   8c44	lcdOnStm32.elf
+  38180	    136	   2472	  40788	   9f54	lcdOnStm32.elf
 Finished building: default.size.stdout
  
 
-21:51:52 Build Finished. 0 errors, 0 warnings. (took 462ms)
+20:10:46 Build Finished. 0 errors, 0 warnings. (took 254ms)
 

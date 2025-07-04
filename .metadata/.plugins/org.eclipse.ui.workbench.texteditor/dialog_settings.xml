@@ -3,21 +3,21 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
-		<item value="peaksPositions"/>
-		<item value="peak"/>
-		<item value="peak:"/>
-		<item value="i2c"/>
-		<item value="HAL_MAX_DELAY"/>
-		<item value="sendi2"/>
+		<item value="MX_I2C1_Init"/>
+		<item value="hi2c1"/>
 		<item value="pull"/>
+		<item value="MX_USART1_UART_Init"/>
+		<item value="uart"/>
+		<item value="HAL_I2C_MspInit"/>
+		<item value="i2c"/>
+		<item value="htim2"/>
+		<item value="delayMicroseconds"/>
+		<item value="updateSweepDisplay"/>
+		<item value="Cavidade Triang"/>
+		<item value="optionButton"/>
 		<item value="MX_TIM2_Init"/>
-		<item value="sendI2CData"/>
-		<item value="selectButton"/>
-		<item value="waiting"/>
-		<item value="currentPeakIndex"/>
-		<item value="min"/>
-		<item value="waitingTime"/>
-		<item value="minAmplitude"/>
+		<item value="MX_TIM1_Init"/>
+		<item value="htim1"/>
 	</list>
 	<list key="replacehistory">
 		<item value="currentLockMode"/>
