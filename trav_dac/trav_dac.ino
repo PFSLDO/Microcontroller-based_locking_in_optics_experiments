@@ -183,11 +183,16 @@ void IRAM_ATTR handleModeSwitchPin() {
 
 ///////////////////////////////////////////////////// Configurações iniciais
 void setup() {
-
   Serial.begin(115200);
-
   lcd.begin(16, 2);
   lcd.clear();
+  lcd.setCursor(3, 0);
+  lcd.print("Travamento");
+  lcd.setCursor(0, 1);
+  lcd.print("Cavidade Triang");
+  delay(2000);
+  lcd.clear();
+
   lcd.setCursor(0, 0);
   lcd.print("Sweep Amp:");
   lcd.print(amp);

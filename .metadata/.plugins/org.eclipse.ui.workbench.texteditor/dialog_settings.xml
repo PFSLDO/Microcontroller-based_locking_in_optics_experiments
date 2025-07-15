@@ -3,6 +3,7 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
+		<item value="rs"/>
 		<item value="MX_I2C1_Init"/>
 		<item value="hi2c1"/>
 		<item value="pull"/>
@@ -17,7 +18,6 @@
 		<item value="optionButton"/>
 		<item value="MX_TIM2_Init"/>
 		<item value="MX_TIM1_Init"/>
-		<item value="htim1"/>
 	</list>
 	<list key="replacehistory">
 		<item value="currentLockMode"/>
