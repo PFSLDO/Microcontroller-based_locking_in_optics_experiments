@@ -210,10 +210,10 @@ void setup() {
   lcd.clear();
 
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep >Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
@@ -229,8 +229,9 @@ void setup() {
   adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuação
 
   // Inicializa o valor do DAC
-  uint16_t valor12bit = map(0, 0, 255, 0, 4095);
-  dac.setVoltage(valor12bit, false);
+  //uint16_t valor12bit = map(0, 0, 255, 0, 4095);
+  //dac.setVoltage(valor12bit, false);
+  dac.setVoltage(value, false);
 
   // Configura os botões com interrupções
   pinMode(increasePin, INPUT_PULLUP);
@@ -270,84 +271,76 @@ void loop() {
     //Atualizações do display após interrupções:
     if(increaseButton == true) {
       increaseButton = false;
-      switch (currentModeSweep) {
-      case AMPLITUDE:
+
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep  Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
-        break;
-      case FREQUENCY:
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
-  lcd.print(amp);
-  lcd.print("V");
+            lcd.setCursor(6, 0);
+          lcd.print(" ");
+          lcd.setCursor(6, 1);
+          lcd.print(" ");
+        if (currentModeSweep == 0) {
+  lcd.setCursor(6, 0);
+  lcd.print(">");
+        } else if (currentModeSweep == 1) {
   lcd.setCursor(6, 1);
-  lcd.print("Freq:");
-  lcd.print(frequency);
-  lcd.print("Hz");
-        break;
-      }
+  lcd.print(">");
+        }
     }
     if(decreaseButton == true) {
       decreaseButton = false;
-      switch (currentModeSweep) {
-      case AMPLITUDE:
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep  Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
-        break;
-      case FREQUENCY:
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
-  lcd.print(amp);
-  lcd.print("V");
+
+            lcd.setCursor(6, 0);
+          lcd.print(" ");
+          lcd.setCursor(6, 1);
+          lcd.print(" ");
+        if (currentModeSweep == 0) {
+  lcd.setCursor(6, 0);
+  lcd.print(">");
+        } else if (currentModeSweep == 1) {
   lcd.setCursor(6, 1);
-  lcd.print("Freq:");
-  lcd.print(frequency);
-  lcd.print("Hz");
-        break;
-      }
+  lcd.print(">");
+        }
     }
     if(optionButton == true) {
       optionButton = false;
-      switch (currentModeSweep) {
-      case AMPLITUDE:
+
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep  Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
-        break;
-      case FREQUENCY:
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
-  lcd.print(amp);
-  lcd.print("V");
+
+            lcd.setCursor(6, 0);
+          lcd.print(" ");
+          lcd.setCursor(6, 1);
+          lcd.print(" ");
+        if (currentModeSweep == 0) {
+  lcd.setCursor(6, 0);
+  lcd.print(">");
+        } else if (currentModeSweep == 1) {
   lcd.setCursor(6, 1);
-  lcd.print("Freq:");
-  lcd.print(frequency);
-  lcd.print("Hz");
-        break;
-      }
+  lcd.print(">");
+        }
     }
     if(modeButton == true) {
       modeButton = false;
@@ -355,18 +348,22 @@ void loop() {
       case SWEEP:
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep  Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
+          lcd.setCursor(6, 0);
+          lcd.print(" ");
+          lcd.setCursor(6, 1);
+          lcd.print(" ");
         if (currentModeSweep == 0) {
-  lcd.setCursor(5, 0);
+  lcd.setCursor(6, 0);
   lcd.print(">");
         } else if (currentModeSweep == 1) {
-  lcd.setCursor(5, 1);
+  lcd.setCursor(6, 1);
   lcd.print(">");
         }
       break;
@@ -381,13 +378,13 @@ void loop() {
   lcd.setCursor(9, 1);
   lcd.print("NRead:");
   lcd.print(numReadings);
-        switch (currentModeLock) {
-          lcd.setCursor(8, 0);
+  lcd.setCursor(8, 0);
           lcd.print(" ");
           lcd.setCursor(0, 1);
           lcd.print(" ");
           lcd.setCursor(8, 1);
           lcd.print(" ");
+        switch (currentModeLock) {
           case STEP:
   lcd.setCursor(8, 0);
   lcd.print(">");
@@ -442,13 +439,24 @@ void loop() {
     //Atualizações do display após interrupções:
     if(increaseButton == true) {
       increaseButton = false;
-      switch (currentModeLock) {
-        lcd.setCursor(8, 0);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Lock     Step:");
+  lcd.print(step);
+  lcd.setCursor(1, 1);
+  lcd.print("Pico:");
+  lcd.print(currentPeakIndex+1);
+  lcd.setCursor(9, 1);
+  lcd.print("NRead:");
+  lcd.print(numReadings);
+      lcd.setCursor(8, 0);
           lcd.print(" ");
           lcd.setCursor(0, 1);
           lcd.print(" ");
           lcd.setCursor(8, 1);
           lcd.print(" ");
+      switch (currentModeLock) {
       case STEP:
   lcd.setCursor(8, 0);
   lcd.print(">");
@@ -465,13 +473,24 @@ void loop() {
     }
     if(decreaseButton == true) {
       decreaseButton = false;
-      switch (currentModeLock) {
-        lcd.setCursor(8, 0);
+      lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Lock     Step:");
+  lcd.print(step);
+  lcd.setCursor(1, 1);
+  lcd.print("Pico:");
+  lcd.print(currentPeakIndex+1);
+  lcd.setCursor(9, 1);
+  lcd.print("NRead:");
+  lcd.print(numReadings);
+
+      lcd.setCursor(8, 0);
           lcd.print(" ");
           lcd.setCursor(0, 1);
           lcd.print(" ");
           lcd.setCursor(8, 1);
           lcd.print(" ");
+      switch (currentModeLock) {
       case STEP:
   lcd.setCursor(8, 0);
   lcd.print(">");
@@ -488,13 +507,14 @@ void loop() {
     }
     if(optionButton == true) {
       optionButton = false;
-      switch (currentModeLock) {
-        lcd.setCursor(8, 0);
+
+      lcd.setCursor(8, 0);
           lcd.print(" ");
           lcd.setCursor(0, 1);
           lcd.print(" ");
           lcd.setCursor(8, 1);
           lcd.print(" ");
+      switch (currentModeLock) {
       case STEP:
   lcd.setCursor(8, 0);
   lcd.print(">");
@@ -515,18 +535,22 @@ void loop() {
       case SWEEP:
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Sweep Amp:");
+  lcd.print("Sweep  Amp:");
   lcd.print(amp);
   lcd.print("V");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(7, 1);
   lcd.print("Freq:");
   lcd.print(frequency);
   lcd.print("Hz");
+  lcd.setCursor(6, 0);
+          lcd.print(" ");
+          lcd.setCursor(6, 1);
+          lcd.print(" ");
         if (currentModeSweep == 0) {
-  lcd.setCursor(5, 0);
+  lcd.setCursor(6, 0);
   lcd.print(">");
         } else if (currentModeSweep == 1) {
-  lcd.setCursor(5, 1);
+  lcd.setCursor(6, 1);
   lcd.print(">");
         }
       break;
@@ -541,13 +565,13 @@ void loop() {
   lcd.setCursor(9, 1);
   lcd.print("NRead:");
   lcd.print(numReadings);
-        switch (currentModeLock) {
-          lcd.setCursor(8, 0);
+  lcd.setCursor(8, 0);
           lcd.print(" ");
           lcd.setCursor(0, 1);
           lcd.print(" ");
           lcd.setCursor(8, 1);
           lcd.print(" ");
+        switch (currentModeLock) {
           case STEP:
   lcd.setCursor(8, 0);
   lcd.print(">");
