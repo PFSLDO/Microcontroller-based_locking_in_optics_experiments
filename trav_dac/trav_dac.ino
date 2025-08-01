@@ -15,8 +15,9 @@ Adafruit_MCP4725 dac;
 
 const adc1_channel_t adcChannel = ADC1_CHANNEL_0; // Canal 0 do ADC (GPIO36)
 
-int resolution = 232;               // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
-int resolutionmax = 255;           // Resolução de 8 bits
+const int dacBits = 12;
+const int resolutionmax = (1 << dacBits) - 1;
+int resolution = int(0.91 * resolutionmax);              // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
 int delayUs = 20;                   // Delay em microssegundos entre as amostras
 int numReadings = 10;          // Número de leituras para calcular a média
 const float referenceVoltage = 3.3; // Tensão de referência (em volts)
@@ -36,7 +37,7 @@ double waiting_time = 1000000/(frequency*resolution*2); //Calcula o periodo espe
 const int buttonPin = 15;    // GPIO8 para alternar modos
 const int increasePin = 4;   // GPIO4 para aumentar valores
 const int decreasePin = 17;  // GPIO17 para diminuir valores
-const int modeSwitchPin = 2; // GPIO2 para alternar entre varredura e travamento
+const int modeSwitchPin = 5; // GPIO2 para alternar entre varredura e travamento
 
 bool optionButton = false;
 bool increaseButton = false;
@@ -51,8 +52,10 @@ enum SystemMode { SWEEP, LOCK };         // Vetor dos modos de operação do sis
 SystemMode currentSystemMode = SWEEP;    // e inicializa na varredura
 
 int targetValue = 0; // Armazena o valor do  DAC que representa o inicio do pico de interesse
-const int peakThreshold = 40; // Limiar para detectar picos = 50mV 
-const int resetThreshold = 20; // Limiar para redefinir a detecção de picos = 25mV
+const float peakThreshold_mV = 50.0;
+const float resetThreshold_mV = 25.0;
+const int peakThreshold = int((peakThreshold_mV / 1000.0) / referenceVoltage * resolutionmax);
+const int resetThreshold = int((resetThreshold_mV / 1000.0) / referenceVoltage * resolutionmax);
 bool detectingPeak = false;     // Flag para indicação de detecção de picos
 std::vector<unsigned int> peaks_place;  // Vetor para armazenar o valor de pzt respectivos para os picos
 int currentPeakIndex = 0;       // Índice do pico atual
@@ -77,19 +80,24 @@ void IRAM_ATTR handleButtonPin() {
 void IRAM_ATTR handleIncreasePin() {
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
+
   if (interruptTime - lastInterruptTime > delayInterrupt) {
     increaseButton = true;
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        resolution += 4; // Salto de aprox 50mV
-        if (resolution > 255) resolution = 255;
+      case AMPLITUDE: {
+        int resolutionStep = int((0.050 / referenceVoltage) * resolutionmax);
+        resolution += resolutionStep;
+
+        if (resolution > resolutionmax) resolution = resolutionmax;
         amp = amp_step*resolution;
         break;
-      case FREQUENCY:
+      }
+      case FREQUENCY: {
         frequency += 5;
         if (frequency > 50) frequency = 50;
         break;
+      }
       }
     waiting_time = 1000000/(frequency*resolution*2);
     }
@@ -123,15 +131,23 @@ void IRAM_ATTR handleDecreasePin() {
     decreaseButton = true;
     if (currentSystemMode == SWEEP) { 
       switch (currentModeSweep) {
-      case AMPLITUDE:
-        resolution -= 4; // Salto de aprox 50mV
-        if (resolution < 12) resolution = 12; // Limite  mínimo de amplitude de 150mV
-        amp = amp_step*resolution;
-        break;
-      case FREQUENCY:
-        frequency -= 5;
-        if (frequency < 5) frequency = 5;
-        break;
+        case AMPLITUDE: {
+          // Salto de aproximadamente 50 mV convertido para unidades do DAC
+          int resolutionStep = int((0.050 / referenceVoltage) * resolutionmax);
+          int resolutionMin = int((0.150 / referenceVoltage) * resolutionmax); // 150 mV
+
+          resolution -= resolutionStep;
+          if (resolution < resolutionMin) resolution = resolutionMin;
+
+          amp = amp_step * resolution;
+          break;
+        }
+
+        case FREQUENCY: {
+          frequency -= 5;
+          if (frequency < 5) frequency = 5;
+          break;
+        }
       }
     waiting_time = 1000000/(frequency*resolution*2);
     }
@@ -357,25 +373,31 @@ void loop() {
       case LOCK:
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Lock   Step:");
+  lcd.print("Lock     Step:");
   lcd.print(step);
   lcd.setCursor(1, 1);
   lcd.print("Pico:");
   lcd.print(currentPeakIndex+1);
-  lcd.setCursor(7, 1);
-  lcd.print("NRed:");
+  lcd.setCursor(9, 1);
+  lcd.print("NRead:");
   lcd.print(numReadings);
         switch (currentModeLock) {
+          lcd.setCursor(8, 0);
+          lcd.print(" ");
+          lcd.setCursor(0, 1);
+          lcd.print(" ");
+          lcd.setCursor(8, 1);
+          lcd.print(" ");
           case STEP:
-  lcd.setCursor(6, 0);
+  lcd.setCursor(8, 0);
   lcd.print(">");
           break;
           case PEAK:
-  lcd.setCursor(1, 1);
+  lcd.setCursor(0, 1);
   lcd.print(">");
           break;
           case AMOSTRAS:
-  lcd.setCursor(6, 1);
+  lcd.setCursor(8, 1);
   lcd.print(">");
           break;
         }
@@ -387,15 +409,18 @@ void loop() {
       cycleEndTime = micros();
     }
 
-    uint16_t valor12bit = map(value, 0, 255, 0, 4095);
-    dac.setVoltage(valor12bit, false);
+    //uint16_t valor12bit = map(value, 0, 255, 0, 4095);
+    //dac.setVoltage(valor12bit, false);
+    dac.setVoltage(value, false);
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   } else if (currentSystemMode == LOCK) {
     //Calcula o novo valor a ser passado para o PZT
     value += direction*step;
-    uint16_t valor12bit = map(value, 0, 255, 0, 4095);
-    dac.setVoltage(valor12bit, false);
+    //uint16_t valor12bit = map(value, 0, 255, 0, 4095);
+    //dac.setVoltage(valor12bit, false);
+    value = constrain(value, 0, resolutionmax);
+    dac.setVoltage(value, false);
 
     //Verifica a resposta do sistema, fazendo uma média na leitura para filtrar o ruído
     long adcSum = 0;
@@ -418,16 +443,22 @@ void loop() {
     if(increaseButton == true) {
       increaseButton = false;
       switch (currentModeLock) {
+        lcd.setCursor(8, 0);
+          lcd.print(" ");
+          lcd.setCursor(0, 1);
+          lcd.print(" ");
+          lcd.setCursor(8, 1);
+          lcd.print(" ");
       case STEP:
-  lcd.setCursor(6, 0);
+  lcd.setCursor(8, 0);
   lcd.print(">");
         break;
       case PEAK:
-  lcd.setCursor(1, 1);
+  lcd.setCursor(0, 1);
   lcd.print(">");
         break;
       case AMOSTRAS:
-  lcd.setCursor(6, 1);
+  lcd.setCursor(8, 1);
   lcd.print(">");
         break;
       }
@@ -435,16 +466,22 @@ void loop() {
     if(decreaseButton == true) {
       decreaseButton = false;
       switch (currentModeLock) {
+        lcd.setCursor(8, 0);
+          lcd.print(" ");
+          lcd.setCursor(0, 1);
+          lcd.print(" ");
+          lcd.setCursor(8, 1);
+          lcd.print(" ");
       case STEP:
-  lcd.setCursor(6, 0);
+  lcd.setCursor(8, 0);
   lcd.print(">");
         break;
       case PEAK:
-  lcd.setCursor(1, 1);
+  lcd.setCursor(0, 1);
   lcd.print(">");
         break;
       case AMOSTRAS:
-  lcd.setCursor(6, 1);
+  lcd.setCursor(8, 1);
   lcd.print(">");
         break;
       }
@@ -452,16 +489,22 @@ void loop() {
     if(optionButton == true) {
       optionButton = false;
       switch (currentModeLock) {
+        lcd.setCursor(8, 0);
+          lcd.print(" ");
+          lcd.setCursor(0, 1);
+          lcd.print(" ");
+          lcd.setCursor(8, 1);
+          lcd.print(" ");
       case STEP:
-  lcd.setCursor(6, 0);
+  lcd.setCursor(8, 0);
   lcd.print(">");
         break;
       case PEAK:
-  lcd.setCursor(1, 1);
+  lcd.setCursor(0, 1);
   lcd.print(">");
         break;
       case AMOSTRAS:
-  lcd.setCursor(6, 1);
+  lcd.setCursor(8, 1);
   lcd.print(">");
         break;
       }
@@ -490,25 +533,31 @@ void loop() {
       case LOCK:
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Lock   Step:");
+  lcd.print("Lock     Step:");
   lcd.print(step);
   lcd.setCursor(1, 1);
   lcd.print("Pico:");
   lcd.print(currentPeakIndex+1);
-  lcd.setCursor(7, 1);
-  lcd.print("NRed:");
+  lcd.setCursor(9, 1);
+  lcd.print("NRead:");
   lcd.print(numReadings);
         switch (currentModeLock) {
+          lcd.setCursor(8, 0);
+          lcd.print(" ");
+          lcd.setCursor(0, 1);
+          lcd.print(" ");
+          lcd.setCursor(8, 1);
+          lcd.print(" ");
           case STEP:
-  lcd.setCursor(6, 0);
+  lcd.setCursor(8, 0);
   lcd.print(">");
           break;
           case PEAK:
-  lcd.setCursor(1, 1);
+  lcd.setCursor(0, 1);
   lcd.print(">");
           break;
           case AMOSTRAS:
-  lcd.setCursor(6, 1);
+  lcd.setCursor(8, 1);
   lcd.print(">");
           break;
         }
