@@ -426,9 +426,11 @@ void loop() {
     dac.setVoltage(value, false);
 
   } else if (currentSystemMode == LOCK) {
-    value += direction*step;
-    //uint16_t valor12bit = map(value, 0, 255, 0, 4095);
-    //dac.setVoltage(valor12bit, false);
+    loat dacSampleRate = 1000000.0 / waiting_time; // em Hz
+    int pointsPerHalfCycle = (int)(dacSampleRate / (2 * frequency));
+    int stepSize = resolution / pointsPerHalfCycle;
+    value += direction * stepSize;
+    //value += direction*step;
     value = constrain(value, 0, resolutionmax);
     dac.setVoltage(value, false);
 
