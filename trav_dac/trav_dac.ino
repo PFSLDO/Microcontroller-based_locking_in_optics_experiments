@@ -243,7 +243,13 @@ void setup() {
 void loop() {
   if (currentSystemMode == SWEEP) {
     cycleStartTime = micros();
-    value += direction;
+
+    // Número de pontos por meio-ciclo
+    float dacSampleRate = 1000000.0 / waiting_time; // em Hz
+    int pointsPerHalfCycle = (int)(dacSampleRate / (2 * frequency));
+    int stepSize = resolution / pointsPerHalfCycle;
+    value += direction * stepSize;
+    //value += direction;
 
     if (value >= resolution) {
       value = resolution;
