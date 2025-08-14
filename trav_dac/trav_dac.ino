@@ -426,7 +426,7 @@ void loop() {
     dac.setVoltage(value, false);
 
   } else if (currentSystemMode == LOCK) {
-    loat dacSampleRate = 1000000.0 / waiting_time; // em Hz
+    float dacSampleRate = 1000000.0 / waiting_time; // em Hz
     int pointsPerHalfCycle = (int)(dacSampleRate / (2 * frequency));
     int stepSize = resolution / pointsPerHalfCycle;
     value += direction * stepSize;
