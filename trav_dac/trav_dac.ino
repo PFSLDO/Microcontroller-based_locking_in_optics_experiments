@@ -206,7 +206,7 @@ void IRAM_ATTR handleModeSwitchPin() {
 ///////////////////////////////////////////////////// Configurações iniciais
 void setup() {
   Serial.begin(115200);
-  lcd.begin(20, 4);
+  lcd.begin(16, 2);
   lcd.clear();
   lcd.setCursor(3, 0);
   lcd.print("Travamento");
