@@ -11,8 +11,10 @@ Adafruit_MCP4725 dac;
 
 const adc1_channel_t adcChannel = ADC1_CHANNEL_0; // Canal 0 do ADC (GPIO36)
 const int dacBits = 12;
+const int dacResolution = 4095;
 const int resolutionmax = (1 << dacBits) - 1;
 int resolution = int(0.91 * resolutionmax);              // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
+const int dacSteps = 200;
 int delayUs = 20;                   // Delay em microssegundos entre as amostras
 int numReadings = 10;          // Número de leituras para calcular a média
 const float referenceVoltage = 3.3; // Tensão de referência (em volts)
@@ -25,9 +27,9 @@ int averageAdcValue = 0; // Armazena o valor lido no ADC
 int lastAdcValue = 0;    // Armazena o último valor lido no ADC
 float amp = amp_step*resolution; //Calcula a amplitude
 int direction = 1; // Variável para direcionar a aproximação do pico
-float  value = 0;    // Variável de saída para o DAC
+float value = 0;    // Variável de saída para o DAC
 int delayInterrupt = 250;
-double waiting_time = 1000000/(frequency*resolution*2); //Calcula o periodo esperado dado a frequência escolhida em microsegundos
+double waiting_time = 0; //Calcula o periodo esperado dado a frequência escolhida em microsegundos
 
 const int buttonPin = 15;    // GPIO8 para alternar modos
 const int increasePin = 4;   // GPIO4 para aumentar valores
@@ -100,7 +102,7 @@ void IRAM_ATTR handleIncreasePin() {
         }
       }
 
-    waiting_time = 1000000/(frequency*resolution*2);
+    waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -153,7 +155,7 @@ void IRAM_ATTR handleDecreasePin() {
         }
       }
 
-    waiting_time = 1000000/(frequency*resolution*2);
+    waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
@@ -238,42 +240,38 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(increasePin), handleIncreasePin, FALLING);
   attachInterrupt(digitalPinToInterrupt(decreasePin), handleDecreasePin, FALLING);
   attachInterrupt(digitalPinToInterrupt(modeSwitchPin), handleModeSwitchPin, FALLING);
+
+  waiting_time = 1000000.0 / (frequency * dacSteps * 2); // em microssegundos
+  Serial.print("Waiting time per step (us): ");
+  Serial.println(waiting_time);
 }
 
 void loop() {
+  static unsigned long lastUpdate = 0;
+
   if (currentSystemMode == SWEEP) {
-    cycleStartTime = micros();
+    unsigned long now = micros();
+    if (now - lastUpdate >= waiting_time) {
+      lastUpdate = now;
 
-    // Número de pontos por meio-ciclo
-    float dacSampleRate = 1000000.0 / waiting_time; // em Hz
-    int pointsPerHalfCycle = (int)(dacSampleRate / (2 * frequency));
-    int stepSize = resolution / pointsPerHalfCycle;
-    value += direction * stepSize;
-    //value += direction;
+      // Atualiza valor do DAC
+      value += direction;
 
-    if (value >= resolution) {
-      value = resolution;
-      direction = -1;
-    } else if (value <= 0) {
-      value = 0;
-      direction = 1;
-    } 
+      // Inverte direção nos limites
+      if (value >= dacSteps) {
+        value = dacSteps;
+        direction = -1;
+      }
+      if (value <= 0) {
+        value = 0;
+        direction = 1;
+      }
 
-    int averageAdcValue = adc1_get_raw(adcChannel);
-    if (direction == 1) {
-      if (averageAdcValue > peakThreshold) {
-        if(detectingPeak) {
-          peaks_place.pop_back();
-        }
-        
-        peaks_place.push_back(value);
-        detectingPeak = true;
-      }      
+      // Mapeia valor para resolução do DAC e envia
+      int dacValue = int(value * (dacResolution / float(dacSteps)));
+      dac.setVoltage(dacValue, false);
     }
-    if (detectingPeak && averageAdcValue < resetThreshold) {
-      detectingPeak = false;
-    }
-
+    
     //Atualizações do display após interrupções:
     if (increaseButton == true) {
       increaseButton = false;
@@ -417,13 +415,13 @@ void loop() {
         break;
       } 
     }
-    cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
-    
-    while (cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
-      cycleEndTime = micros();
-    }
+    //cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
+    //
+    //while (cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
+    //  cycleEndTime = micros();
+    //}
 
-    dac.setVoltage(value, false);
+    //dac.setVoltage(value, false);
 
   } else if (currentSystemMode == LOCK) {
     float dacSampleRate = 1000000.0 / waiting_time; // em Hz
