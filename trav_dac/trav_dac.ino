@@ -30,6 +30,7 @@ int direction = 1; // Variável para direcionar a aproximação do pico
 float value = 0;    // Variável de saída para o DAC
 int delayInterrupt = 250;
 double waiting_time = 0; //Calcula o periodo esperado dado a frequência escolhida em microsegundos
+int stepSize = 16;        // pular de 16 em 16 (reduz nº de steps)
 
 const int buttonPin = 15;    // GPIO8 para alternar modos
 const int increasePin = 4;   // GPIO4 para aumentar valores
@@ -102,7 +103,8 @@ void IRAM_ATTR handleIncreasePin() {
         }
       }
 
-    waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
+    //waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
+    waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -155,7 +157,8 @@ void IRAM_ATTR handleDecreasePin() {
         }
       }
 
-    waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
+    //waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
+    waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
@@ -241,7 +244,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(decreasePin), handleDecreasePin, FALLING);
   attachInterrupt(digitalPinToInterrupt(modeSwitchPin), handleModeSwitchPin, FALLING);
 
-  waiting_time = 1000000.0 / (frequency * dacSteps * 2); // em microssegundos
+  //waiting_time = 1000000.0 / (frequency * dacSteps * 2); // em microssegundos
+  waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
   Serial.print("Waiting time per step (us): ");
   Serial.println(waiting_time);
 }
@@ -250,26 +254,32 @@ void loop() {
   static unsigned long lastUpdate = 0;
 
   if (currentSystemMode == SWEEP) {
-    unsigned long now = micros();
-    if (now - lastUpdate >= waiting_time) {
-      lastUpdate = now;
+    cycleStartTime = micros();
 
-      // Atualiza valor do DAC
-      value += direction;
+    value += direction * stepSize;
+    if (value >= resolution) {
+      value = resolution;
+      direction = -1;
+    } else if (value <= 0) {
+      value = 0;
+      direction = 1;
+    }
 
-      // Inverte direção nos limites
-      if (value >= dacSteps) {
-        value = dacSteps;
-        direction = -1;
+    int averageAdcValue = adc1_get_raw(adcChannel);
+    // Detecção de picos (apenas quando a varredura está em direção positiva)
+    if (direction == 1) {
+      if (averageAdcValue > peakThreshold) {
+        if(detectingPeak){
+          peaks_place.pop_back();
+        }
+        
+        peaks_place.push_back(value);
+        detectingPeak = true;
       }
-      if (value <= 0) {
-        value = 0;
-        direction = 1;
-      }
-
-      // Mapeia valor para resolução do DAC e envia
-      int dacValue = int(value * (dacResolution / float(dacSteps)));
-      dac.setVoltage(dacValue, false);
+    }
+    
+    if (detectingPeak && averageAdcValue < resetThreshold) {
+      detectingPeak = false;
     }
     
     //Atualizações do display após interrupções:
@@ -415,6 +425,13 @@ void loop() {
         break;
       } 
     }
+
+    cycleEndTime = micros();
+    while (cycleEndTime - cycleStartTime < waiting_time) {
+      cycleEndTime = micros();
+    }
+
+    dac.setVoltage(value, false);
     //cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
     //
     //while (cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
