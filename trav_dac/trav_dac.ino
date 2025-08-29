@@ -13,14 +13,14 @@ const adc1_channel_t adcChannel = ADC1_CHANNEL_0; // Canal 0 do ADC (GPIO36)
 const int dacBits = 12;
 const int dacResolution = 4095;
 const int resolutionmax = (1 << dacBits) - 1;
-int resolution = int(0.91 * resolutionmax);              // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
-const int dacSteps = 200;
+int resolution = int(0.91 * dacResolution);              // Inicializa a amplitude do sinal triangular como sendo ~ 3V, armazena o nível de amplitude
+const int dacSteps = 400;
 int delayUs = 20;                   // Delay em microssegundos entre as amostras
 int numReadings = 10;          // Número de leituras para calcular a média
 const float referenceVoltage = 3.3; // Tensão de referência (em volts)
 unsigned long cycleStartTime = 0;   // Armazena o tempo de início do ciclo
 unsigned long cycleEndTime = 0;     // Armazena o tempo de fim do ciclo
-int frequency = 10;               // Inicializa a frequência do sinal em 10Hz, armazena a frequência
+int frequency = 20;               // Inicializa a frequência do sinal em 10Hz, armazena a frequência
 float amp_step = referenceVoltage/resolutionmax; // Dado necessário para o cálculo da mostra da amplitude
 int step = 1;            // Passo para a rapidez do travamento
 int averageAdcValue = 0; // Armazena o valor lido no ADC
@@ -104,7 +104,7 @@ void IRAM_ATTR handleIncreasePin() {
       }
 
     //waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
-    waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
+    waiting_time = 1000000.0 / (frequency * (dacSteps) * 2);
     }
     else if (currentSystemMode == LOCK) {
       switch (currentModeLock) {
@@ -158,7 +158,7 @@ void IRAM_ATTR handleDecreasePin() {
       }
 
     //waiting_time = (1000000.0 / frequency) / (2.0 * resolution);
-    waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
+    waiting_time = 1000000.0 / (frequency * (dacSteps) * 2);
     }
     else if (currentSystemMode == LOCK) { 
       switch (currentModeLock) {
@@ -245,25 +245,34 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(modeSwitchPin), handleModeSwitchPin, FALLING);
 
   //waiting_time = 1000000.0 / (frequency * dacSteps * 2); // em microssegundos
-  waiting_time = 1000000.0 / (frequency * (resolution/stepSize) * 2);
+  waiting_time = 1000000.0 / (frequency * (dacSteps) * 2);
   Serial.print("Waiting time per step (us): ");
   Serial.println(waiting_time);
+  //unsigned long lastUpdateee = 0;
 }
 
 void loop() {
-  static unsigned long lastUpdate = 0;
+  //static unsigned long lastUpdate = 0;
 
   if (currentSystemMode == SWEEP) {
     cycleStartTime = micros();
+    //unsigned long now = micros();
 
-    value += direction * stepSize;
-    if (value >= resolution) {
-      value = resolution;
-      direction = -1;
-    } else if (value <= 0) {
-      value = 0;
-      direction = 1;
-    }
+    //if (now - lastUpdateee >= waiting_time) {
+    //  lastUpdateee = now;
+//
+      // Atualiza valor do DAC
+      value += direction;
+
+      // Inverte direção nos limites
+      if (value >= dacSteps) {
+        value = dacSteps;
+        direction = -1;
+      }
+      if (value <= 0) {
+        value = 0;
+        direction = 1;
+      }
 
     int averageAdcValue = adc1_get_raw(adcChannel);
     // Detecção de picos (apenas quando a varredura está em direção positiva)
@@ -426,12 +435,14 @@ void loop() {
       } 
     }
 
-    cycleEndTime = micros();
-    while (cycleEndTime - cycleStartTime < waiting_time) {
+    cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
+    while(cycleEndTime - cycleStartTime < waiting_time) {
       cycleEndTime = micros();
     }
-
-    dac.setVoltage(value, false);
+    
+    int dacValue = int(value * (dacResolution / float(dacSteps)));
+    //int dacValue = int(value * dacSteps);
+      dac.setVoltage(dacValue, false);
     //cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
     //
     //while (cycleEndTime - cycleStartTime < waiting_time) { //Verifica se esse período de nivel ja ocorreu, se não ele continua preso no looping até dar o tempo
