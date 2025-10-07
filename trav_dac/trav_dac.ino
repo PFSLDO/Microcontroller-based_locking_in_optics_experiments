@@ -6,7 +6,13 @@
 #include <LiquidCrystal.h>
 #include <Adafruit_MCP4725.h>
 
-LiquidCrystal lcd(12, 14, 27, 26, 25, 33);
+const int RS = 12;
+const int E  = 14;
+const int D4 = 27;
+const int D5 = 26;
+const int D6 = 25;
+const int D7 = 33;
+LiquidCrystal lcd(RS, E, D4, D5, D6, D7);
 Adafruit_MCP4725 dac;
 
 const adc1_channel_t adcChannel = ADC1_CHANNEL_0; // Canal 0 do ADC (GPIO36)
@@ -21,7 +27,7 @@ int numReadings = 10;          // Número de leituras para calcular a média
 const float referenceVoltage = 3.3; // Tensão de referência (em volts)
 unsigned long cycleStartTime = 0;   // Armazena o tempo de início do ciclo
 unsigned long cycleEndTime = 0;     // Armazena o tempo de fim do ciclo
-float frequency = 20;               // Inicializa a frequência do sinal em 10Hz, armazena a frequência
+float frequency = 5;               // Inicializa a frequência do sinal em 10Hz, armazena a frequência
 float amp_step = referenceVoltage/resolutionmax; // Dado necessário para o cálculo da mostra da amplitude
 int step = 1;            // Passo para a rapidez do travamento
 int averageAdcValue = 0; // Armazena o valor lido no ADC
@@ -31,7 +37,7 @@ int direction = 1; // Variável para direcionar a aproximação do pico
 float value = 0;    // Variável de saída para o DAC
 int delayInterrupt = 250;
 double waiting_time = 0; //Calcula o periodo esperado dado a frequência escolhida em microsegundos
-float stepSize = 32;        // pular de 16 em 16 (reduz nº de steps)
+float stepSize = 16;        // pular de 16 em 16 (reduz nº de steps)
 
 const int buttonPin = 15;    // GPIO8 para alternar modos
 const int increasePin = 4;   // GPIO4 para aumentar valores
@@ -212,14 +218,15 @@ void IRAM_ATTR handleModeSwitchPin() {
 ///////////////////////////////////////////////////// Configurações iniciais
 void setup() {
   Serial.begin(115200);
-  lcd.begin(16, 2);
+  lcd.begin(20, 4);
   lcd.clear();
-  lcd.setCursor(3, 0);
+  lcd.setCursor(5, 0);
   lcd.print("Travamento");
   lcd.setCursor(0, 1);
-  lcd.print("Cavidade Triang");
+  lcd.print("Cavidade Triangular");
   delay(2000);
   lcd.clear();
+
   lcd.setCursor(0, 0);
   lcd.print("Sweep >Amp:");
   lcd.print(amp);
@@ -266,22 +273,22 @@ void loop() {
       direction = 1;
     }
 
-    int averageAdcValue = adc1_get_raw(adcChannel);
-    // Detecção de picos (apenas quando a varredura está em direção positiva)
-    if (direction == 1) {
-      if (averageAdcValue > peakThreshold) {
-        if(detectingPeak){
-          peaks_place.pop_back();
-        }
-        
-        peaks_place.push_back(value);
-        detectingPeak = true;
-      }
-    }
-    
-    if (detectingPeak && averageAdcValue < resetThreshold) {
-      detectingPeak = false;
-    }
+    //int averageAdcValue = adc1_get_raw(adcChannel);
+    //// Detecção de picos (apenas quando a varredura está em direção positiva)
+    //if (direction == 1) {
+    //  if (averageAdcValue > peakThreshold) {
+    //    if(detectingPeak){
+    //      peaks_place.pop_back();
+    //    }
+    //    
+    //    peaks_place.push_back(value);
+    //    detectingPeak = true;
+    //  }
+    //}
+    //
+    //if (detectingPeak && averageAdcValue < resetThreshold) {
+    //  detectingPeak = false;
+    //}
     
     //Atualizações do display após interrupções:
     if (increaseButton == true) {
@@ -428,14 +435,14 @@ void loop() {
     }
 
     cycleEndTime = micros();
-    Serial.print("cycleEndTime - cycleStartTime: ");
-    Serial.println(cycleEndTime - cycleStartTime);
+    //Serial.print("cycleEndTime - cycleStartTime: ");
+    //Serial.println(cycleEndTime - cycleStartTime);
     while (cycleEndTime - cycleStartTime < waiting_time) {
       cycleEndTime = micros();
     }
 
-    Serial.print("cycleEndTime - cycleStartTime222222: ");
-    Serial.println(cycleEndTime - cycleStartTime);
+    //Serial.print("cycleEndTime - cycleStartTime222222: ");
+    //Serial.println(cycleEndTime - cycleStartTime);
 
     dac.setVoltage(value, false);
     //cycleEndTime = micros(); // Verifica o tempo que demorou nessa iteração
