@@ -238,6 +238,7 @@ void setup() {
 
   Wire.begin();
   dac.begin(0x60);
+  Wire.setClock(400000);
 
   adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(adcChannel, ADC_ATTEN_DB_0);  // Sem atenuação
