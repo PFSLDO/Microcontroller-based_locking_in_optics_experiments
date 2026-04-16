@@ -41,7 +41,7 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
 ### Microcontrolador
 - **ESP32 NodeMCU WROOM32 WiFi**
   - DAC interno: 2 canais (GPIO25/P25, GPIO26/P26)
-  - ADC: Múltiplos canais (GPIO36/P36, GPIO39/P39, etc.)
+  - ADC: Múltiplos canais (GPIO35/P35, GPIO34/P34, GPIO33/P33, GPIO32/P32)
   - I2C: Integrado (GPIO21/P21=SDA, GPIO22/P22=SCL)
 
 ### Display
@@ -80,7 +80,7 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
 │  └──────────────────────────────────────────────────────────┘   │
 └─────┬───────────┬───────────┬───────────┬───────────┬───────────┘
       │           │           │           │           │
-   D25 (DAC1)  P36 (ADC)    I2C (P21/P22)  GPIO (Botões)  PZT
+   P25 (DAC1)  P35 (ADC)    I2C (P21/P22)  GPIO (Botões)  PZT
       │           │           │           │           │
       │           │        ┌──┴────┐      │           │
       │           │        │       │      │           │
@@ -107,13 +107,17 @@ ESP32 NodeMCU WROOM32 PIN ASSIGNMENT
 [GPIO25 (P25)] ──────────► DAC1 (8 bits para PZT)
 [GPIO26 (P26)] ──────────► DAC2 (não usado neste projeto)
 
-[GPIO36 (P36)] ──────────► ADC1_CH0 (sinal do fotodetector)
-(Note: GPIO36=ADC1_CHANNEL_0, requer atenuação AD DB_0)
+[GPIO35 (P35)] ──────────► ADC1_CH7 (sinal do fotodetector)
+(Note: GPIO35=ADC1_CHANNEL_7, requer atenuação AD DB_0)
 
 [GPIO21 (P21)] ──────────┐
                         ├─ I2C (400kHz)
 [GPIO22 (P22)] ──────────┤
                         └─► MCP4725 (endereço 0x60)
+
+Onde:
+- GPIO21 (P21) = SDA (Serial Data)
+- GPIO22 (P22) = SCL (Serial Clock)
 
 [GPIO12 (P12)] ──────────► LCD RS
 [GPIO14 (P14)] ──────────► LCD EN
@@ -165,11 +169,11 @@ ESP32 GPIO25 (P25)
 ### 2️⃣ Fotodetector (Entrada do Sinal)
 
 ```
-Fotodetector (Amplificador saída)
+ESP32 GPIO35 (P35)
         │
         0-3.3V (sinal analógico)
         │
-ESP32 GPIO36 (P36)
+Fotodetector (Amplificador saída)
         │
        GND ─────────────── Fotodetector GND
 ```
@@ -224,7 +228,10 @@ MCP4725 (12 bits, via I2C)
   PIN 6 [OUT]  ───────────────► Amplificador/Comparador PZT
   PIN 7 [GND]  ───────────────► GND
   
-  Endereço I2C: 0x60 (se A0 conectado em GND)
+  Conexão I2C:
+  - SDA (Serial Data) = GPIO21 (P21)
+  - SCL (Serial Clock) = GPIO22 (P22)
+  - Endereço I2C: 0x60 (se A0 conectado em GND)
   
   ┌─ Capacitor 100nF entre VCC e GND (próximo ao módulo)
 ```
@@ -332,6 +339,10 @@ Taxa de atualização:      ~500-1000 Hz (com múltiplas amostras)
 ```cpp
 Wire.begin(21, 22);        // SDA=GPIO21 (P21), SCL=GPIO22 (P22)
 Wire.setClock(400000);     // 400kHz para máxima velocidade
+
+**Importante:**
+- SDA (Serial Data) = GPIO21 (P21) - Dados
+- SCL (Serial Clock) = GPIO22 (P22) - Clock
 ```
 
 ### 3. Proteção de Picos
@@ -356,8 +367,8 @@ Wire.setClock(400000);     // 400kHz para máxima velocidade
 | Problema | Causa Provável | Solução |
 |----------|---|---|
 | Display não aparece | Conexão paralela incorreta ou alimentação errada | Verificar pinos RS/E/D4-D7 (P12/P14/P13/P27/P26/P16), RW/GND, VCC e contraste |
-| DAC externo não responde | Endereço wrong (0x60?) | Variar A0 (GND ou 3.3V), testar com scanner I2C em P21/P22 |
-| Leitura ADC errada | Atenuação insuficiente | Aumentar ADC_ATTEN_DB_11 se > 1.2V no pino P36 |
+| DAC externo não responde | Endereço wrong (0x60?) ou pinos I2C trocados | Variar A0 (GND ou 3.3V), verificar SDA em P21 e SCL em P22, testar com scanner I2C |
+| Leitura ADC errada | Atenuação insuficiente | Aumentar ADC_ATTEN_DB_11 se > 1.2V no pino P35 |
 | Oscilação em LOCK | Step muito grande | Reduzir step (botão -) |
 | PZT não responde em SWEEP | DAC desabilitado | Verificar `dac_output_enable()` no pino P25 |
 | Botões não respondem | Pull-up não funciona | Testar GPIO direto com Serial nos pinos P15/P4/P17/P2 |

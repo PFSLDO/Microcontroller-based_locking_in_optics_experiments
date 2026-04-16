@@ -23,7 +23,7 @@ LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 // DAC Externo: 12 bits (0-4095) = 0-5V (tipicamente 0-3.3V com jumper apropriado)
 
 const dac_channel_t dacChannel = DAC_CHANNEL_1;    // DAC interno (GPIO25)
-const adc1_channel_t adcChannel = ADC1_CHANNEL_0;  // ADC (GPIO36)
+const adc1_channel_t adcChannel = ADC1_CHANNEL_7;  // ADC (GPIO35)
 
 // Parâmetros de SWEEP
 int resolution = 232;        // Amplitude em 8 bits (DAC interno)
