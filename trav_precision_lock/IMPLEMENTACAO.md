@@ -39,10 +39,10 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
 ## 🔧 Componentes Necessários {#componentes}
 
 ### Microcontrolador
-- **ESP32 DevKit** (qualquer variante padrão)
-  - DAC interno: 2 canais (GPIO25, GPIO26)
-  - ADC: Múltiplos canais
-  - I2C: Integrado (GPIO21=SDA, GPIO22=SCL)
+- **ESP32 NodeMCU WROOM32 WiFi**
+  - DAC interno: 2 canais (GPIO25/P25, GPIO26/P26)
+  - ADC: Múltiplos canais (GPIO36/P36, GPIO39/P39, etc.)
+  - I2C: Integrado (GPIO21/P21=SDA, GPIO22/P22=SCL)
 
 ### Display
 - **LCD 20x4 (HD44780 compatível)**
@@ -74,14 +74,13 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          ESP32 DevKit                            │
+│                    ESP32 NodeMCU WROOM32                        │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                    Controle e Processamento              │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────┬───────────┬───────────┬───────────┬───────────┬───────────┘
       │           │           │           │           │
-   GPIO25      GPIO36       I2C          GPIO         GPIO
-   (DAC1)      (ADC1)     (SDA/SCL)    (Botões)      (PZT)
+   D25 (DAC1)  P36 (ADC)    I2C (P21/P22)  GPIO (Botões)  PZT
       │           │           │           │           │
       │           │        ┌──┴────┐      │           │
       │           │        │       │      │           │
@@ -102,38 +101,38 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
 ### Esquema Detalhado de Pinos
 
 ```
-ESP32 PIN ASSIGNMENT
+ESP32 NodeMCU WROOM32 PIN ASSIGNMENT
 ═══════════════════════════════════════════
 
-[GPIO25] ──────────► DAC1 (8 bits para PZT)
-[GPIO26] ──────────► DAC2 (não usado neste projeto)
+[GPIO25 (P25)] ──────────► DAC1 (8 bits para PZT)
+[GPIO26 (P26)] ──────────► DAC2 (não usado neste projeto)
 
-[GPIO36] ──────────► ADC1_CH0 (sinal do fotodetector)
+[GPIO36 (P36)] ──────────► ADC1_CH0 (sinal do fotodetector)
 (Note: GPIO36=ADC1_CHANNEL_0, requer atenuação AD DB_0)
 
-[GPIO21] ──────────┐
-                   ├─ I2C (400kHz)
-[GPIO22] ──────────┤
-                   └─► MCP4725 (endereço 0x60)
+[GPIO21 (P21)] ──────────┐
+                        ├─ I2C (400kHz)
+[GPIO22 (P22)] ──────────┤
+                        └─► MCP4725 (endereço 0x60)
 
-[GPIO12] ──────────► LCD RS
-[GPIO14] ──────────► LCD EN
-[GPIO13] ──────────► LCD D4
-[GPIO27] ──────────► LCD D5
-[GPIO26] ──────────► LCD D6
-[GPIO16] ──────────► LCD D7
+[GPIO12 (P12)] ──────────► LCD RS
+[GPIO14 (P14)] ──────────► LCD EN
+[GPIO13 (P13)] ──────────► LCD D4
+[GPIO27 (P27)] ──────────► LCD D5
+[GPIO26 (P26)] ──────────► LCD D6
+[GPIO16 (P16)] ──────────► LCD D7
 
-[GPIO15] ──────────► BOTÃO 1 (Pull-up interno)
-                       └─ Alterna opções (AMPLITUDE ↔ FREQUENCY em SWEEP)
+[GPIO15 (P15)] ──────────► BOTÃO 1 (Pull-up interno)
+                          └─ Alterna opções (AMPLITUDE ↔ FREQUENCY em SWEEP)
 
-[GPIO4]  ──────────► BOTÃO 2 (Pull-up interno)
-                       └─ Incrementa (+)
+[GPIO4 (P4)]  ──────────► BOTÃO 2 (Pull-up interno)
+                          └─ Incrementa (+)
 
-[GPIO17] ──────────► BOTÃO 3 (Pull-up interno)
-                       └─ Decrementa (-)
+[GPIO17 (P17)] ──────────► BOTÃO 3 (Pull-up interno)
+                          └─ Decrementa (-)
 
-[GPIO2]  ──────────► BOTÃO 4 (Pull-up interno)
-                       └─ Alterna modo (SWEEP ↔ LOCK)
+[GPIO2 (P2)]  ──────────► BOTÃO 4 (Pull-up interno)
+                          └─ Alterna modo (SWEEP ↔ LOCK)
 
 [GND]   ──────────► Malha comum (todos os GNDs)
 
@@ -147,7 +146,7 @@ ESP32 PIN ASSIGNMENT
 ### 1️⃣ Cristal de PZT (para Varredura)
 
 ```
-ESP32 GPIO25 (DAC1)
+ESP32 GPIO25 (P25)
         │
         R 100Ω (opcional, proteção)
         │
@@ -157,7 +156,7 @@ ESP32 GPIO25 (DAC1)
 ```
 
 **Notas:**
-- Tensão: 0-3.3V (controlada por GPIO25, 0-255 em 8 bits)
+- Tensão: 0-3.3V (controlada por GPIO25/P25, 0-255 em 8 bits)
 - Para maior potência, usar amplificador de voltagem externo
 - Recomendado: Resistor de proteção 100Ω
 
@@ -170,7 +169,7 @@ Fotodetector (Amplificador saída)
         │
         0-3.3V (sinal analógico)
         │
-ESP32 GPIO36 (ADC1_CH0)
+ESP32 GPIO36 (P36)
         │
        GND ─────────────── Fotodetector GND
 ```
@@ -191,13 +190,13 @@ LCD 20x4 (HD44780 compatível)
   PIN 1 [VSS]  ───┬──────────► GND
   PIN 2 [VDD]  ───┬──────────► 5V (ou 3.3V se suportado)
   PIN 3 [VO]   ───┬──────────► Contraste (potenciômetro de 10k)
-  PIN 4 [RS]   ───┬──────────► ESP32 GPIO12
+  PIN 4 [RS]   ───┬──────────► ESP32 GPIO12 (P12)
   PIN 5 [RW]   ───┬──────────► GND
-  PIN 6 [E]    ───┬──────────► ESP32 GPIO14
-  PIN 11[D4]  ───┬──────────► ESP32 GPIO13
-  PIN 12[D5]  ───┬──────────► ESP32 GPIO27
-  PIN 13[D6]  ───┬──────────► ESP32 GPIO26
-  PIN 14[D7]  ───┬──────────► ESP32 GPIO16
+  PIN 6 [E]    ───┬──────────► ESP32 GPIO14 (P14)
+  PIN 11[D4]  ───┬──────────► ESP32 GPIO13 (P13)
+  PIN 12[D5]  ───┬──────────► ESP32 GPIO27 (P27)
+  PIN 13[D6]  ───┬──────────► ESP32 GPIO26 (P26)
+  PIN 14[D7]  ───┬──────────► ESP32 GPIO16 (P16)
 
   ┌─ Capacitor 100nF entre VCC e GND (próximo ao módulo)
 ```
@@ -218,8 +217,8 @@ MCP4725 (12 bits, via I2C)
 ═══════════════════════════
   PIN 1 [VCC]  ───┬──────────► 3.3V (ou 5V)
   PIN 2 [GND]  ───┬──────────► GND
-  PIN 3 [SCL]  ───┼──────────► ESP32 GPIO22 (I2C Clock)
-  PIN 4 [SDA]  ───┼──────────► ESP32 GPIO21 (I2C Data)
+  PIN 3 [SCL]  ───┼──────────► ESP32 GPIO22 (P22) (I2C Clock)
+  PIN 4 [SDA]  ───┼──────────► ESP32 GPIO21 (P21) (I2C Data)
   PIN 5 [A0]   ───┘──────────► GND (endereço 0x60)
                              ou 3.3V (endereço 0x61)
   PIN 6 [OUT]  ───────────────► Amplificador/Comparador PZT
@@ -243,19 +242,19 @@ MCP4725 (12 bits, via I2C)
 ```
 Todos os botões usam PULL-UP INTERNO do ESP32
 
-BOTÃO 1 (GPIO15)      BOTÃO 2 (GPIO4)       BOTÃO 3 (GPIO17)    BOTÃO 4 (GPIO2)
-    │                     │                      │                   │
-   3.3V                  3.3V                   3.3V                3.3V
-    │                     │                      │                   │
-    ├─ [SW] ─┐         ├─ [SW] ─┐           ├─ [SW] ─┐        ├─ [SW] ─┐
-    │        │         │        │            │        │         │        │
-   GND       └────────────► GPIO15         GND       │         │        │
-                                                       └───────────► GPIO4
-            GND                                    GND              │
-                                                             └───────────► GPIO17
-                                                        GND          GND
-                                                                   └────────► GPIO2
-                                                                    GND
+BOTÃO 1 (GPIO15/P15)      BOTÃO 2 (GPIO4/P4)       BOTÃO 3 (GPIO17/P17)    BOTÃO 4 (GPIO2/P2)
+    │                        │                         │                      │
+   3.3V                     3.3V                      3.3V                   3.3V
+    │                        │                         │                      │
+    ├─ [SW] ─┐            ├─ [SW] ─┐               ├─ [SW] ─┐           ├─ [SW] ─┐
+    │        │            │        │               │        │           │        │
+   GND       └────────────► GPIO15 (P15)         GND       │           │        │
+                                                          └───────────► GPIO4 (P4)
+               GND                                   GND              │
+                                                                └───────────► GPIO17 (P17)
+                                                           GND          GND
+                                                                      └────────► GPIO2 (P2)
+                                                                       GND
 ```
 
 **Configuração:**
@@ -331,7 +330,7 @@ Taxa de atualização:      ~500-1000 Hz (com múltiplas amostras)
 
 ### 2. Comunicação I2C
 ```cpp
-Wire.begin(21, 22);        // SDA=21, SCL=22
+Wire.begin(21, 22);        // SDA=GPIO21 (P21), SCL=GPIO22 (P22)
 Wire.setClock(400000);     // 400kHz para máxima velocidade
 ```
 
@@ -356,12 +355,12 @@ Wire.setClock(400000);     // 400kHz para máxima velocidade
 
 | Problema | Causa Provável | Solução |
 |----------|---|---|
-| Display não aparece | Conexão paralela incorreta ou alimentação errada | Verificar pinos RS/E/D4-D7, RW/GND, VCC e contraste |
-| DAC externo não responde | Endereço wrong (0x60?) | Variar A0 (GND ou 3.3V), testar com scanner |
-| Leitura ADC errada | Atenuação insuficiente | Aumentar ADC_ATTEN_DB_11 se > 1.2V |
+| Display não aparece | Conexão paralela incorreta ou alimentação errada | Verificar pinos RS/E/D4-D7 (P12/P14/P13/P27/P26/P16), RW/GND, VCC e contraste |
+| DAC externo não responde | Endereço wrong (0x60?) | Variar A0 (GND ou 3.3V), testar com scanner I2C em P21/P22 |
+| Leitura ADC errada | Atenuação insuficiente | Aumentar ADC_ATTEN_DB_11 se > 1.2V no pino P36 |
 | Oscilação em LOCK | Step muito grande | Reduzir step (botão -) |
-| PZT não responde em SWEEP | DAC desabilitado | Verificar `dac_output_enable()` |
-| Botões não respondem | Pull-up não funciona | Testar GPIO direto com Serial |
+| PZT não responde em SWEEP | DAC desabilitado | Verificar `dac_output_enable()` no pino P25 |
+| Botões não respondem | Pull-up não funciona | Testar GPIO direto com Serial nos pinos P15/P4/P17/P2 |
 
 ---
 
