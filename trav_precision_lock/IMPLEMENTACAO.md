@@ -45,9 +45,10 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
   - I2C: Integrado (GPIO21=SDA, GPIO22=SCL)
 
 ### Display
-- **OLED SSD1306 (128x64 pixels)**
-  - Comunicação: I2C
-  - Tensão: 3.3V
+- **LCD 20x4 (HD44780 compatível)**
+  - Comunicação: Paralela (4 bits)
+  - Tensão: 5V ou 3.3V dependendo do módulo
+  - Interfaces usadas: RS, E, D4, D5, D6, D7
 
 ### DAC Externo
 - **MCP4725 (Adafruit ou genérico)**
@@ -86,7 +87,7 @@ Este sistema implementa uma **estratégia híbrida de varredura e travamento** u
       │           │        │       │      │           │
       ▼           ▼        ▼       ▼      ▼           ▼
    ┌────┐    ┌────────┐ ┌────┐ ┌────┐ ┌─────┐   ┌─────────┐
-   │DAC│    │ ADC    │ │OLED│ │MCP │ │BTN  │   │  PZT    │
+   │DAC│    │ ADC    │ │LCD │ │MCP │ │BTN  │   │  PZT    │
    │INT│    │FOTO    │ │    │ │4725│ │ x4  │   │Control  │
    └────┘    └────────┘ └────┘ └────┘ └─────┘   └─────────┘
       │           │        │       │
@@ -113,8 +114,14 @@ ESP32 PIN ASSIGNMENT
 [GPIO21] ──────────┐
                    ├─ I2C (400kHz)
 [GPIO22] ──────────┤
-                   └─► OLED SSD1306 (endereço 0x3C)
                    └─► MCP4725 (endereço 0x60)
+
+[GPIO12] ──────────► LCD RS
+[GPIO14] ──────────► LCD EN
+[GPIO13] ──────────► LCD D4
+[GPIO27] ──────────► LCD D5
+[GPIO26] ──────────► LCD D6
+[GPIO16] ──────────► LCD D7
 
 [GPIO15] ──────────► BOTÃO 1 (Pull-up interno)
                        └─ Alterna opções (AMPLITUDE ↔ FREQUENCY em SWEEP)
@@ -176,27 +183,31 @@ ESP32 GPIO36 (ADC1_CH0)
 
 ---
 
-### 3️⃣ Display OLED SSD1306
+### 3️⃣ Display LCD 20x4
 
 ```
-OLED SSD1306 (128x64)
-═════════════════════════
-  PIN 1 [GND]  ───┬──────────► GND
-  PIN 2 [VCC]  ───┬──────────► 3.3V (ou 5V, depende do módulo)
-  PIN 3 [SCL]  ───┼──────────► ESP32 GPIO22 (I2C Clock)
-  PIN 4 [SDA]  ───┴──────────► ESP32 GPIO21 (I2C Data)
-  
-  Endereço I2C: 0x3C
-  
+LCD 20x4 (HD44780 compatível)
+═══════════════════════════════════
+  PIN 1 [VSS]  ───┬──────────► GND
+  PIN 2 [VDD]  ───┬──────────► 5V (ou 3.3V se suportado)
+  PIN 3 [VO]   ───┬──────────► Contraste (potenciômetro de 10k)
+  PIN 4 [RS]   ───┬──────────► ESP32 GPIO12
+  PIN 5 [RW]   ───┬──────────► GND
+  PIN 6 [E]    ───┬──────────► ESP32 GPIO14
+  PIN 11[D4]  ───┬──────────► ESP32 GPIO13
+  PIN 12[D5]  ───┬──────────► ESP32 GPIO27
+  PIN 13[D6]  ───┬──────────► ESP32 GPIO26
+  PIN 14[D7]  ───┬──────────► ESP32 GPIO16
+
   ┌─ Capacitor 100nF entre VCC e GND (próximo ao módulo)
 ```
 
 **Notas:**
-- Comunicação I2C em 400kHz
+- Comunicação paralela 4 bits
 - Display mostra:
   - Modo atual (SWEEP ou LOCK)
   - Parâmetros ajustáveis (Amplitude, Frequência, Step, Picos)
-  - Cursor indicador (">")
+  - Indicador de opção selecionada (">")
 
 ---
 
@@ -314,7 +325,7 @@ Taxa de atualização:      ~500-1000 Hz (com múltiplas amostras)
 
 ### 1. Alimentação
 - ✅ **ESP32**: USB 5V ou bateria 3.7V (com regulador)
-- ✅ **OLED**: 3.3V (geralmente embutido no módulo)
+- ✅ **LCD 20x4**: 5V ou 3.3V (usar contraste apropriado)
 - ✅ **MCP4725**: 3.3V ou 5V (verificar jumper do módulo)
 - ⚠️ **Fotodetector/PZT**: Depende do amplificador externo
 
@@ -345,7 +356,7 @@ Wire.setClock(400000);     // 400kHz para máxima velocidade
 
 | Problema | Causa Provável | Solução |
 |----------|---|---|
-| Display não aparece | I2C erro, endereço 0x3C? | Verificar conexão, usar scanner I2C |
+| Display não aparece | Conexão paralela incorreta ou alimentação errada | Verificar pinos RS/E/D4-D7, RW/GND, VCC e contraste |
 | DAC externo não responde | Endereço wrong (0x60?) | Variar A0 (GND ou 3.3V), testar com scanner |
 | Leitura ADC errada | Atenuação insuficiente | Aumentar ADC_ATTEN_DB_11 se > 1.2V |
 | Oscilação em LOCK | Step muito grande | Reduzir step (botão -) |
@@ -361,15 +372,14 @@ Wire.setClock(400000);     // 400kHz para máxima velocidade
 #include <driver/dac.h>           // DAC interno
 #include <driver/adc.h>           // ADC
 #include <esp_adc_cal.h>          // Calibração ADC
-#include <Wire.h>                 // I2C
-#include <Adafruit_GFX.h>         // Gráficos display
-#include <Adafruit_SSD1306.h>     // Display SSD1306
+#include <Wire.h>                 // I2C para MCP4725
+#include <LiquidCrystal.h>        // Display LCD 20x4
 ```
 
 ### Links Úteis
 - 📖 [ESP32 Pinout Reference](https://randomnerdtutorials.com/esp32-pinout-reference-Which-GPIO-pins-should-you-use/)
 - 📖 [MCP4725 Datasheet](https://ww1.microchip.com/en-us/product/MCP4725)
-- 📖 [Adafruit SSD1306 Library](https://github.com/adafruit/Adafruit_SSD1306)
+- 📖 [LiquidCrystal Arduino Library](https://www.arduino.cc/reference/en/libraries/liquidcrystal/)
 
 ---
 

@@ -3,15 +3,16 @@
 #include <esp_adc_cal.h>
 #include <vector>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <LiquidCrystal.h>
 
-/////////////////////////////////////// CONFIGURAÇÕES DO DISPLAY OLED
-#define LARGURA_OLED 128
-#define ALTURA_OLED 64
-#define RESET_OLED -1
-
-Adafruit_SSD1306 display(LARGURA_OLED, ALTURA_OLED, &Wire, RESET_OLED);
+/////////////////////////////////////// CONFIGURAÇÕES DO DISPLAY LCD 20x4
+const int lcdRs = 12;
+const int lcdEn = 14;
+const int lcdD4 = 13;
+const int lcdD5 = 27;
+const int lcdD6 = 26;
+const int lcdD7 = 16;
+LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 
 /////////////////////////////////////// CONFIGURAÇÕES DO MCP4725
 #define MCP4725_ADDR 0x60     // Endereço I2C padrão do MCP4725
@@ -219,63 +220,53 @@ void IRAM_ATTR handleModeSwitchPin() {
 /////////////////////////////////////// FUNÇÕES AUXILIARES DE DISPLAY
 
 void updateDisplaySweep() {
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.clearDisplay();
-  display.setCursor(15, 8);
-  display.print("Modo:Varredura");
-  display.drawLine(15, 17, 15 + 14 * 6, 17, WHITE);
-  display.setCursor(15, 30);
-  display.print("Amplitude:");
-  display.print(amp);
-  display.print("V");
-  display.setCursor(15, 50);
-  display.print("Frequencia:");
-  display.print(frequency);
-  display.print("Hz");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Modo: Varredura");
+  lcd.setCursor(0, 1);
+  lcd.print("Amp:");
+  lcd.print(amp);
+  lcd.print("V  ");
+  lcd.setCursor(0, 2);
+  lcd.print("Freq:");
+  lcd.print(frequency);
+  lcd.print("Hz");
+  lcd.setCursor(0, 3);
   if (currentModeSweep == AMPLITUDE) {
-    display.setCursor(0, 30);
+    lcd.print("> Amplitude       ");
   } else {
-    display.setCursor(0, 50);
+    lcd.print("> Frequencia      ");
   }
-  display.write(62);
-  display.display();
 }
 
 void updateDisplayLock() {
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.clearDisplay();
-  display.setCursor(15, 8);
-  display.print("Modo:Travamento");
-  display.drawLine(15, 17, 15 + 15 * 6, 17, WHITE);
-  display.setCursor(15, 20);
-  display.print("Step:");
-  display.print(step);
-  display.setCursor(15, 32);
-  display.print("Pico:");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Modo: Travamento");
+  lcd.setCursor(0, 1);
+  lcd.print("Step:");
+  lcd.print(step);
+  lcd.print("   Pico:");
   if (!peaks_place.empty()) {
-    display.print(currentPeakIndex + 1);
+    lcd.print(currentPeakIndex + 1);
   } else {
-    display.print("-");
+    lcd.print("-");
   }
-  display.setCursor(15, 44);
-  display.print("Amostras:");
-  display.print(numReadings);
-
+  lcd.setCursor(0, 2);
+  lcd.print("Amostras:");
+  lcd.print(numReadings);
+  lcd.setCursor(0, 3);
   switch (currentModeLock) {
     case STEP:
-      display.setCursor(0, 20);
+      lcd.print("> Step            ");
       break;
     case PEAK:
-      display.setCursor(0, 32);
+      lcd.print("> Pico            ");
       break;
     case AMOSTRAS:
-      display.setCursor(0, 44);
+      lcd.print("> Amostras       ");
       break;
   }
-  display.write(62);
-  display.display();
 }
 
 /////////////////////////////////////// SETUP
@@ -286,11 +277,8 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);  // 400kHz I2C clock
 
-  // Configura display OLED
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("Falha ao inicializar display SSD1306"));
-    while (1);
-  }
+  // Configura display LCD 20x4
+  lcd.begin(20, 4);
   updateDisplaySweep();
 
   // Configura DAC interno
